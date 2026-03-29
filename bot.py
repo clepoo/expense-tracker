@@ -188,10 +188,15 @@ Card notes:
 Rules:
 - If no card is mentioned, default to "Cash"
 - If no category is clear, infer from the description
-- If amount has $ sign or is just a number, that's the total
-- "split with X" or "half" means my_amt = total / 2
+- The first standalone number is the total amount
+- Split rules (apply in this order):
+    1. "split 3" or "my share 3" or "i pay 3" — my_amt = that specific number (e.g. split 3 means you pay $3)
+    2. "split half", "split equally", "half" — my_amt = total / 2
+    3. "split" with no amount — my_amt = total / 2
+    4. no split mentioned — my_amt = total
+- "yes" or "no" at the end of the message = qualifying charge override
 - Dates: if not mentioned, use today ({date.today().isoformat()})
-- qualifying: "Yes" unless it's a cash transaction or clearly ineligible
+- qualifying: "Yes" unless it's a cash transaction or user says "no"
 
 Respond ONLY with a JSON object, no other text:
 {{
