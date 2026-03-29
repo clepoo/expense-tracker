@@ -1,16 +1,12 @@
 """
 seed.py — Run once on Railway to populate the database with historical data.
 Usage: python seed.py
-
-Set DB_PATH env var if needed (defaults to finbot.db).
-Re-running is safe — it clears and re-inserts everything.
+Re-running is safe — clears and re-inserts everything.
 """
-
-import sqlite3, os, json
+import sqlite3, os
 from datetime import datetime
 
 DB_PATH = os.environ.get("DB_PATH", "finbot.db")
-
 DATA = {
   "transactions": [
     {
@@ -351,7 +347,7 @@ DATA = {
       "category": "Food",
       "total": 24.48,
       "my_amt": 24.48,
-      "card": "OCBC Infinity",
+      "card": "OCBC REWARDS",
       "qualifying": "Yes"
     },
     {
@@ -406,7 +402,7 @@ DATA = {
       "category": "Food",
       "total": 4.8,
       "my_amt": 4.8,
-      "card": "OCBC Infinity",
+      "card": "OCBC REWARDS",
       "qualifying": "Yes"
     },
     {
@@ -483,7 +479,7 @@ DATA = {
       "category": "Food",
       "total": 0.5,
       "my_amt": 0.5,
-      "card": "OCBC Infinity",
+      "card": "OCBC REWARDS",
       "qualifying": "Yes"
     },
     {
@@ -494,7 +490,7 @@ DATA = {
       "category": "Food",
       "total": 5.8,
       "my_amt": 5.8,
-      "card": "OCBC Infinity",
+      "card": "OCBC REWARDS",
       "qualifying": "Yes"
     },
     {
@@ -538,7 +534,7 @@ DATA = {
       "category": "Food",
       "total": 1.1,
       "my_amt": 1.1,
-      "card": "OCBC Infinity",
+      "card": "OCBC REWARDS",
       "qualifying": "Yes"
     },
     {
@@ -633,6 +629,17 @@ DATA = {
       "id": 57,
       "type": "expense",
       "date": "2026-02-02",
+      "desc": "Wawa Lala",
+      "category": "Food",
+      "total": 9.5,
+      "my_amt": 9.5,
+      "card": "Cash",
+      "qualifying": "No"
+    },
+    {
+      "id": 58,
+      "type": "expense",
+      "date": "2026-02-02",
       "desc": "Shopee - Allulose",
       "category": "Shopping",
       "total": 27.71,
@@ -641,7 +648,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 58,
+      "id": 59,
       "type": "expense",
       "date": "2026-02-02",
       "desc": "Steam - Where Winds Meet 900 Coins",
@@ -652,18 +659,18 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 59,
+      "id": 60,
       "type": "expense",
       "date": "2026-02-03",
       "desc": "Foodpanda - PPP Coffee",
       "category": "Food",
       "total": 4.39,
       "my_amt": 4.39,
-      "card": "OCBC Infinity",
+      "card": "OCBC REWARDS",
       "qualifying": "Yes"
     },
     {
-      "id": 60,
+      "id": 61,
       "type": "expense",
       "date": "2026-02-04",
       "desc": "Scoot (HK)",
@@ -674,7 +681,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 61,
+      "id": 62,
       "type": "expense",
       "date": "2026-02-04",
       "desc": "Trip.com Hotel (HK)",
@@ -685,18 +692,18 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 62,
+      "id": 63,
       "type": "expense",
       "date": "2026-02-06",
       "desc": "Foodpanda - Amacha + Waffle",
       "category": "Food",
       "total": 5.3,
       "my_amt": 5.3,
-      "card": "OCBC Infinity",
+      "card": "OCBC REWARDS",
       "qualifying": "Yes"
     },
     {
-      "id": 63,
+      "id": 64,
       "type": "expense",
       "date": "2026-02-06",
       "desc": "Grab Home",
@@ -707,7 +714,18 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 64,
+      "id": 65,
+      "type": "expense",
+      "date": "2026-02-07",
+      "desc": "Kilian Imperial Tea 10ml + Nishane Wulong Cha 5ml",
+      "category": "Shopping",
+      "total": 58.0,
+      "my_amt": 58.0,
+      "card": "Cash",
+      "qualifying": "No"
+    },
+    {
+      "id": 66,
       "type": "expense",
       "date": "2026-02-07",
       "desc": "Home Dusk",
@@ -718,7 +736,7 @@ DATA = {
       "qualifying": "No"
     },
     {
-      "id": 65,
+      "id": 67,
       "type": "expense",
       "date": "2026-02-09",
       "desc": "Humpback Oyster",
@@ -729,7 +747,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 66,
+      "id": 68,
       "type": "expense",
       "date": "2026-02-11",
       "desc": "Compose Coffee",
@@ -740,7 +758,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 67,
+      "id": 69,
       "type": "expense",
       "date": "2026-02-13",
       "desc": "Saboten Tonkatsu",
@@ -751,7 +769,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 68,
+      "id": 70,
       "type": "expense",
       "date": "2026-02-13",
       "desc": "Joma Shop - Nishane Wulong Cha",
@@ -762,7 +780,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 69,
+      "id": 71,
       "type": "expense",
       "date": "2026-02-13",
       "desc": "La Maison Du Chocolat (Valentines Gift)",
@@ -773,7 +791,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 70,
+      "id": 72,
       "type": "expense",
       "date": "2026-02-13",
       "desc": "Mcdonalds Coke Zero",
@@ -784,7 +802,29 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 71,
+      "id": 73,
+      "type": "expense",
+      "date": "2026-02-13",
+      "desc": "Hardrock Caf\u00e9 Unfiltered",
+      "category": "Entertainment",
+      "total": 11.0,
+      "my_amt": 11.0,
+      "card": "Cash",
+      "qualifying": "No"
+    },
+    {
+      "id": 74,
+      "type": "expense",
+      "date": "2026-02-16",
+      "desc": "Ban Mian",
+      "category": "Food",
+      "total": 8.4,
+      "my_amt": 8.4,
+      "card": "Cash",
+      "qualifying": "No"
+    },
+    {
+      "id": 75,
       "type": "expense",
       "date": "2026-02-19",
       "desc": "Compose Coffee",
@@ -795,7 +835,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 72,
+      "id": 76,
       "type": "expense",
       "date": "2026-02-21",
       "desc": "TCM - Medications",
@@ -806,7 +846,7 @@ DATA = {
       "qualifying": "No"
     },
     {
-      "id": 73,
+      "id": 77,
       "type": "expense",
       "date": "2026-02-21",
       "desc": "Shopee - Metagreen + etc",
@@ -817,7 +857,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 74,
+      "id": 78,
       "type": "expense",
       "date": "2026-02-22",
       "desc": "TeaFlight (KUL <-> SIN)",
@@ -828,7 +868,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 75,
+      "id": 79,
       "type": "expense",
       "date": "2026-02-23",
       "desc": "TCM Package",
@@ -839,7 +879,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 76,
+      "id": 80,
       "type": "expense",
       "date": "2026-02-24",
       "desc": "Mediya - Salmon Sashimi",
@@ -850,7 +890,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 77,
+      "id": 81,
       "type": "expense",
       "date": "2026-02-24",
       "desc": "Cold Storage - Gummies",
@@ -861,7 +901,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 78,
+      "id": 82,
       "type": "expense",
       "date": "2026-02-25",
       "desc": "Shopee - Chicken Breast Ham x6",
@@ -872,7 +912,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 79,
+      "id": 83,
       "type": "expense",
       "date": "2026-02-25",
       "desc": "Taobao - Clothes, Miu Jacket (Refunded), Alo Pants",
@@ -883,7 +923,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 80,
+      "id": 84,
       "type": "expense",
       "date": "2026-02-25",
       "desc": "Shopee - Metagreen + Coffee Xylitol Candy",
@@ -894,7 +934,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 81,
+      "id": 85,
       "type": "expense",
       "date": "2026-02-25",
       "desc": "Starbucks Top Up",
@@ -905,7 +945,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 82,
+      "id": 86,
       "type": "expense",
       "date": "2026-02-25",
       "desc": "Claude AI",
@@ -916,7 +956,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 83,
+      "id": 87,
       "type": "expense",
       "date": "2026-02-26",
       "desc": "TCM - Medications",
@@ -927,7 +967,7 @@ DATA = {
       "qualifying": "No"
     },
     {
-      "id": 84,
+      "id": 88,
       "type": "expense",
       "date": "2026-02-27",
       "desc": "Alipay - Breguet Watch + Miu Hoodie",
@@ -938,7 +978,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 85,
+      "id": 89,
       "type": "expense",
       "date": "2026-02-28",
       "desc": "Singtel - Phone Bill",
@@ -949,7 +989,7 @@ DATA = {
       "qualifying": "No"
     },
     {
-      "id": 86,
+      "id": 90,
       "type": "expense",
       "date": "2026-03-01",
       "desc": "Shopee - Aestura (Andrew)",
@@ -960,7 +1000,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 87,
+      "id": 91,
       "type": "expense",
       "date": "2026-03-01",
       "desc": "Alipay - Breguet Watch + Miu Hoodie",
@@ -971,7 +1011,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 88,
+      "id": 92,
       "type": "expense",
       "date": "2026-03-01",
       "desc": "Taobao - Miu Sunglasses, Invis Ultrasonic Cleaner, Off Shoulder Top",
@@ -982,7 +1022,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 89,
+      "id": 93,
       "type": "expense",
       "date": "2026-03-01",
       "desc": "Shopee - Kelp Noodles, Food Art Soup",
@@ -993,7 +1033,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 90,
+      "id": 94,
       "type": "expense",
       "date": "2026-03-02",
       "desc": "Compose Coffee",
@@ -1004,7 +1044,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 91,
+      "id": 95,
       "type": "expense",
       "date": "2026-03-02",
       "desc": "Humpback Oyster",
@@ -1015,7 +1055,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 92,
+      "id": 96,
       "type": "expense",
       "date": "2026-03-02",
       "desc": "Shopee - Dr Get IT Glutathione Whitening x4",
@@ -1026,7 +1066,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 93,
+      "id": 97,
       "type": "expense",
       "date": "2026-03-03",
       "desc": "Shopee - Coffee Candy, Kelp Noodle, HK Esim",
@@ -1037,7 +1077,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 94,
+      "id": 98,
       "type": "expense",
       "date": "2026-03-03",
       "desc": "Shopee - Sterra Y Filter",
@@ -1048,7 +1088,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 95,
+      "id": 99,
       "type": "expense",
       "date": "2026-03-03",
       "desc": "Sterra - Filter Replacement Service",
@@ -1059,7 +1099,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 96,
+      "id": 100,
       "type": "expense",
       "date": "2026-03-03",
       "desc": "Shopee - Metagreen Booster, Mouth Rinse",
@@ -1070,10 +1110,10 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 97,
+      "id": 101,
       "type": "expense",
       "date": "2026-03-03",
-      "desc": "Wawa Lala ",
+      "desc": "Wawa Lala",
       "category": "Food",
       "total": 10.0,
       "my_amt": 10.0,
@@ -1081,7 +1121,7 @@ DATA = {
       "qualifying": "No"
     },
     {
-      "id": 98,
+      "id": 102,
       "type": "expense",
       "date": "2026-03-03",
       "desc": "Become Aesthetics - 5X HIFU, 3X Sylfirm X",
@@ -1092,7 +1132,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 99,
+      "id": 103,
       "type": "expense",
       "date": "2026-03-04",
       "desc": "TCM - Medications",
@@ -1103,7 +1143,7 @@ DATA = {
       "qualifying": "No"
     },
     {
-      "id": 100,
+      "id": 104,
       "type": "expense",
       "date": "2026-03-04",
       "desc": "Shopee - Tangle Angel Mini",
@@ -1114,7 +1154,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 101,
+      "id": 105,
       "type": "expense",
       "date": "2026-03-04",
       "desc": "Chagee",
@@ -1125,7 +1165,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 102,
+      "id": 106,
       "type": "expense",
       "date": "2026-03-04",
       "desc": "TCM",
@@ -1136,7 +1176,7 @@ DATA = {
       "qualifying": "No"
     },
     {
-      "id": 103,
+      "id": 107,
       "type": "expense",
       "date": "2026-03-05",
       "desc": "SGD to HKD",
@@ -1147,7 +1187,7 @@ DATA = {
       "qualifying": "No"
     },
     {
-      "id": 104,
+      "id": 108,
       "type": "expense",
       "date": "2026-03-07",
       "desc": "100 Plus Zero",
@@ -1158,7 +1198,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 105,
+      "id": 109,
       "type": "expense",
       "date": "2026-03-07",
       "desc": "Uber to Hotel",
@@ -1169,7 +1209,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 106,
+      "id": 110,
       "type": "expense",
       "date": "2026-03-07",
       "desc": "Coconut Candy",
@@ -1180,7 +1220,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 107,
+      "id": 111,
       "type": "expense",
       "date": "2026-03-07",
       "desc": "Muji Tie Guan Yin Chocolate",
@@ -1191,7 +1231,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 108,
+      "id": 112,
       "type": "expense",
       "date": "2026-03-07",
       "desc": "Market Place Drinks",
@@ -1202,7 +1242,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 109,
+      "id": 113,
       "type": "expense",
       "date": "2026-03-07",
       "desc": "Lung Shin Medicine",
@@ -1213,7 +1253,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 110,
+      "id": 114,
       "type": "expense",
       "date": "2026-03-07",
       "desc": "MTR Rides",
@@ -1224,7 +1264,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 111,
+      "id": 115,
       "type": "expense",
       "date": "2026-03-08",
       "desc": "Bakehouse Egg Tarts",
@@ -1235,7 +1275,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 112,
+      "id": 116,
       "type": "expense",
       "date": "2026-03-08",
       "desc": "Cartier",
@@ -1246,7 +1286,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 113,
+      "id": 117,
       "type": "expense",
       "date": "2026-03-08",
       "desc": "Yuet Beauty - Onda Pro 2 Parts",
@@ -1257,7 +1297,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 114,
+      "id": 118,
       "type": "expense",
       "date": "2026-03-08",
       "desc": "Fook Hai Jewellery - White Gold Diamond Earrings",
@@ -1268,7 +1308,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 115,
+      "id": 119,
       "type": "expense",
       "date": "2026-03-08",
       "desc": "Duddell's Goose Rice",
@@ -1279,7 +1319,18 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 116,
+      "id": 120,
+      "type": "expense",
+      "date": "2026-03-09",
+      "desc": "Starbucks",
+      "category": "Food",
+      "total": 3.2,
+      "my_amt": 3.2,
+      "card": "Cash",
+      "qualifying": "No"
+    },
+    {
+      "id": 121,
       "type": "expense",
       "date": "2026-03-10",
       "desc": "Compose Coffee",
@@ -1290,7 +1341,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 117,
+      "id": 122,
       "type": "expense",
       "date": "2026-03-10",
       "desc": "Cold Storage - Yogurt, Milk",
@@ -1301,7 +1352,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 118,
+      "id": 123,
       "type": "expense",
       "date": "2026-03-10",
       "desc": "Invisalign Deposit",
@@ -1312,7 +1363,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 119,
+      "id": 124,
       "type": "expense",
       "date": "2026-03-10",
       "desc": "Invisalign Deposit",
@@ -1323,7 +1374,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 120,
+      "id": 125,
       "type": "expense",
       "date": "2026-03-10",
       "desc": "Invisalign Deposit",
@@ -1334,7 +1385,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 121,
+      "id": 126,
       "type": "expense",
       "date": "2026-03-10",
       "desc": "Invisalign Deposit",
@@ -1345,7 +1396,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 122,
+      "id": 127,
       "type": "expense",
       "date": "2026-03-11",
       "desc": "Compose Coffee",
@@ -1356,7 +1407,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 123,
+      "id": 128,
       "type": "expense",
       "date": "2026-03-11",
       "desc": "U Aesthetic Onda Pro Trial Deposit",
@@ -1367,7 +1418,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 124,
+      "id": 129,
       "type": "expense",
       "date": "2026-03-12",
       "desc": "Compose Coffee",
@@ -1378,7 +1429,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 125,
+      "id": 130,
       "type": "expense",
       "date": "2026-03-13",
       "desc": "Compose Coffee",
@@ -1389,7 +1440,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 126,
+      "id": 131,
       "type": "expense",
       "date": "2026-03-13",
       "desc": "Pawa Bakery Honey Garlic Toast",
@@ -1400,7 +1451,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 127,
+      "id": 132,
       "type": "expense",
       "date": "2026-03-15",
       "desc": "Become Aesthetics",
@@ -1411,7 +1462,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 128,
+      "id": 133,
       "type": "expense",
       "date": "2026-04-02",
       "desc": "Become Aesthetics - 5X HIFU, 3X Sylfirm X",
@@ -1422,7 +1473,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 129,
+      "id": 134,
       "type": "expense",
       "date": "2026-04-10",
       "desc": "Become Aesthetics",
@@ -1433,7 +1484,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 130,
+      "id": 135,
       "type": "expense",
       "date": "2026-05-02",
       "desc": "Become Aesthetics - 5X HIFU, 3X Sylfirm X",
@@ -1444,7 +1495,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 131,
+      "id": 136,
       "type": "expense",
       "date": "2026-05-10",
       "desc": "Become Aesthetics",
@@ -1455,7 +1506,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 132,
+      "id": 137,
       "type": "expense",
       "date": "2026-06-01",
       "desc": "Become Aesthetics - 5X HIFU, 3X Sylfirm X",
@@ -1466,7 +1517,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 133,
+      "id": 138,
       "type": "expense",
       "date": "2026-06-09",
       "desc": "Become Aesthetics",
@@ -1477,7 +1528,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 134,
+      "id": 139,
       "type": "expense",
       "date": "2026-07-01",
       "desc": "Become Aesthetics - 5X HIFU, 3X Sylfirm X",
@@ -1488,7 +1539,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 135,
+      "id": 140,
       "type": "expense",
       "date": "2026-08-01",
       "desc": "Become Aesthetics - 5X HIFU, 3X Sylfirm X",
@@ -1499,7 +1550,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 136,
+      "id": 141,
       "type": "expense",
       "date": "2026-03-15",
       "desc": "Taobao - Work Pants, Top, Toothbrush, Bottle Cleaner, Luggage Tag, Misc",
@@ -1510,7 +1561,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 137,
+      "id": 142,
       "type": "expense",
       "date": "2026-03-15",
       "desc": "Taobao - Hermes Belt",
@@ -1521,7 +1572,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 138,
+      "id": 143,
       "type": "expense",
       "date": "2026-03-16",
       "desc": "Compose Coffee",
@@ -1532,7 +1583,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 139,
+      "id": 144,
       "type": "expense",
       "date": "2026-03-16",
       "desc": "Grab Home from Office",
@@ -1543,7 +1594,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 140,
+      "id": 145,
       "type": "expense",
       "date": "2026-03-17",
       "desc": "Compose Coffee",
@@ -1554,7 +1605,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 141,
+      "id": 146,
       "type": "expense",
       "date": "2026-03-18",
       "desc": "Compose Coffee",
@@ -1565,7 +1616,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 142,
+      "id": 147,
       "type": "expense",
       "date": "2026-03-19",
       "desc": "Compose Coffee",
@@ -1576,7 +1627,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 143,
+      "id": 148,
       "type": "expense",
       "date": "2026-03-19",
       "desc": "Grab Home from Office",
@@ -1587,7 +1638,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 144,
+      "id": 149,
       "type": "expense",
       "date": "2026-03-18",
       "desc": "Onggii Korean Food",
@@ -1598,7 +1649,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 145,
+      "id": 150,
       "type": "expense",
       "date": "2026-03-18",
       "desc": "Have Fun KTV",
@@ -1609,7 +1660,7 @@ DATA = {
       "qualifying": "No"
     },
     {
-      "id": 146,
+      "id": 151,
       "type": "expense",
       "date": "2026-03-20",
       "desc": "Loreal Friend's and Family",
@@ -1620,7 +1671,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 147,
+      "id": 152,
       "type": "expense",
       "date": "2026-03-20",
       "desc": "Loreal Friend's and Family",
@@ -1631,7 +1682,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 148,
+      "id": 153,
       "type": "expense",
       "date": "2026-03-20",
       "desc": "Compose Coffee",
@@ -1642,7 +1693,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 149,
+      "id": 154,
       "type": "expense",
       "date": "2026-03-20",
       "desc": "Panda Chan Snack",
@@ -1653,7 +1704,18 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 150,
+      "id": 155,
+      "type": "expense",
+      "date": "2026-03-20",
+      "desc": "Ramen",
+      "category": "Food",
+      "total": 19.0,
+      "my_amt": 19.0,
+      "card": "Cash",
+      "qualifying": "No"
+    },
+    {
+      "id": 156,
       "type": "expense",
       "date": "2026-03-22",
       "desc": "McDonald's",
@@ -1664,7 +1726,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 151,
+      "id": 157,
       "type": "expense",
       "date": "2026-03-24",
       "desc": "Compose Coffee",
@@ -1675,7 +1737,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 152,
+      "id": 158,
       "type": "expense",
       "date": "2026-03-24",
       "desc": "Shopee - Lutein",
@@ -1686,7 +1748,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 153,
+      "id": 159,
       "type": "expense",
       "date": "2026-03-24",
       "desc": "Grab Home from Office",
@@ -1694,6 +1756,160 @@ DATA = {
       "total": 17.8,
       "my_amt": 17.8,
       "card": "DBS WWMC",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 160,
+      "type": "expense",
+      "date": "2026-03-25",
+      "desc": "Compose Coffee",
+      "category": "Food",
+      "total": 9.9,
+      "my_amt": 3.3,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 161,
+      "type": "expense",
+      "date": "2026-03-25",
+      "desc": "Claude AI",
+      "category": "Bills",
+      "total": 30.0,
+      "my_amt": 30.0,
+      "card": "DBS WWMC",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 162,
+      "type": "expense",
+      "date": "2026-03-25",
+      "desc": "Shopee - Konjac Jelly",
+      "category": "Food",
+      "total": 23.37,
+      "my_amt": 23.37,
+      "card": "OCBC REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 163,
+      "type": "expense",
+      "date": "2026-03-25",
+      "desc": "Fat Freeze",
+      "category": "Health, Beauty & Wellness",
+      "total": 488.32,
+      "my_amt": 488.32,
+      "card": "UOB PRIVI",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 164,
+      "type": "expense",
+      "date": "2026-03-26",
+      "desc": "Shopee - Mints, Lashes",
+      "category": "Shopping",
+      "total": 26.79,
+      "my_amt": 26.79,
+      "card": "OCBC REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 165,
+      "type": "expense",
+      "date": "2026-03-26",
+      "desc": "Compose Coffee",
+      "category": "Food",
+      "total": 3.3,
+      "my_amt": 3.3,
+      "card": "UOB PRIVI",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 166,
+      "type": "expense",
+      "date": "2026-03-26",
+      "desc": "Claude AI",
+      "category": "Bills",
+      "total": 5.45,
+      "my_amt": 5.45,
+      "card": "DBS WWMC",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 167,
+      "type": "expense",
+      "date": "2026-03-27",
+      "desc": "Starbucks",
+      "category": "Food",
+      "total": 10.0,
+      "my_amt": 10.0,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 168,
+      "type": "expense",
+      "date": "2026-03-28",
+      "desc": "100 Plus Zero",
+      "category": "Food",
+      "total": 2.5,
+      "my_amt": 2.5,
+      "card": "UOB PRIVI",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 169,
+      "type": "expense",
+      "date": "2026-03-28",
+      "desc": "Mr Bean Pistachio Pancake",
+      "category": "Food",
+      "total": 4.0,
+      "my_amt": 4.0,
+      "card": "Cash",
+      "qualifying": "No"
+    },
+    {
+      "id": 170,
+      "type": "expense",
+      "date": "2026-03-29",
+      "desc": "Illumia Face - Kyung Rak Facial",
+      "category": "Health, Beauty & Wellness",
+      "total": 117.72,
+      "my_amt": 117.72,
+      "card": "UOB PRIVI",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 171,
+      "type": "expense",
+      "date": "2026-03-29",
+      "desc": "Johan Bakery",
+      "category": "Food",
+      "total": 5.12,
+      "my_amt": 5.12,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 172,
+      "type": "expense",
+      "date": "2026-03-29",
+      "desc": "Isetan",
+      "category": "Groceries",
+      "total": 31.0,
+      "my_amt": 31.0,
+      "card": "UOB PRIVI",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 173,
+      "type": "expense",
+      "date": "2026-03-29",
+      "desc": "Isetan - Mom",
+      "category": "Food",
+      "total": 10.8,
+      "my_amt": 10.8,
+      "card": "UOB PRIVI",
       "qualifying": "Yes"
     }
   ],
@@ -3257,75 +3473,47 @@ DATA = {
 def seed():
     conn = sqlite3.connect(DB_PATH)
     print(f"Connected to {DB_PATH}")
-
-    # Create tables if they don't exist
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS transactions (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            date        TEXT NOT NULL,
-            desc        TEXT NOT NULL,
-            category    TEXT NOT NULL,
-            total       REAL NOT NULL,
-            my_amt      REAL NOT NULL,
-            card        TEXT NOT NULL,
-            qualifying  TEXT NOT NULL DEFAULT 'Yes',
-            type        TEXT NOT NULL DEFAULT 'expense',
-            created_at  TEXT NOT NULL
+            id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT NOT NULL,
+            desc TEXT NOT NULL, category TEXT NOT NULL, total REAL NOT NULL,
+            my_amt REAL NOT NULL, card TEXT NOT NULL,
+            qualifying TEXT NOT NULL DEFAULT 'Yes',
+            type TEXT NOT NULL DEFAULT 'expense', created_at TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS sales (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            date        TEXT NOT NULL,
-            desc        TEXT NOT NULL,
-            revenue     REAL NOT NULL,
-            cost        REAL NOT NULL DEFAULT 0,
-            profit      REAL NOT NULL DEFAULT 0,
-            created_at  TEXT NOT NULL
+            id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT NOT NULL,
+            desc TEXT NOT NULL, revenue REAL NOT NULL, cost REAL NOT NULL DEFAULT 0,
+            profit REAL NOT NULL DEFAULT 0, created_at TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS recurring (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            name        TEXT NOT NULL,
-            amount      REAL NOT NULL,
-            category    TEXT NOT NULL,
-            active      INTEGER NOT NULL DEFAULT 1
+            id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
+            amount REAL NOT NULL, category TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1
         );
     """)
-
-    # Clear existing historical data and re-insert cleanly
     conn.execute("DELETE FROM transactions")
     conn.execute("DELETE FROM sales")
     conn.execute("DELETE FROM recurring")
     print("Cleared existing data.")
-
     now = datetime.now().isoformat()
-
-    # Insert transactions
     for t in DATA["transactions"]:
-        conn.execute("""
-            INSERT INTO transactions (date, desc, category, total, my_amt, card, qualifying, type, created_at)
-            VALUES (?,?,?,?,?,?,?,?,?)
-        """, (t["date"], t["desc"], t["category"], t["total"], t["my_amt"],
-              t["card"], t["qualifying"], t.get("type","expense"), now))
+        conn.execute(
+            "INSERT INTO transactions (date,desc,category,total,my_amt,card,qualifying,type,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+            (t["date"],t["desc"],t["category"],t["total"],t["my_amt"],t["card"],t["qualifying"],t.get("type","expense"),now)
+        )
     print(f"Inserted {len(DATA['transactions'])} transactions.")
-
-    # Insert sales
     for s in DATA["sales"]:
-        conn.execute("""
-            INSERT INTO sales (date, desc, revenue, cost, profit, created_at)
-            VALUES (?,?,?,?,?,?)
-        """, (s["date"], s["desc"], s["revenue"], s["cost"], s["profit"], now))
+        conn.execute(
+            "INSERT INTO sales (date,desc,revenue,cost,profit,created_at) VALUES (?,?,?,?,?,?)",
+            (s["date"],s["desc"],s["revenue"],s["cost"],s["profit"],now)
+        )
     print(f"Inserted {len(DATA['sales'])} sales.")
-
-    # Insert recurring items
     for r in DATA["recurring"]:
-        conn.execute("""
-            INSERT INTO recurring (name, amount, category, active)
-            VALUES (?,?,?,1)
-        """, (r["name"], r["amount"], r["category"]))
+        conn.execute("INSERT INTO recurring (name,amount,category,active) VALUES (?,?,?,1)",
+                     (r["name"],r["amount"],r["category"]))
     print(f"Inserted {len(DATA['recurring'])} recurring items.")
-
-    conn.commit()
-    conn.close()
-    print("✅ Seed complete.")
+    conn.commit(); conn.close()
+    print("\n✅ Seed complete.")
 
 if __name__ == "__main__":
     seed()
