@@ -347,7 +347,7 @@ DATA = {
       "category": "Food",
       "total": 24.48,
       "my_amt": 24.48,
-      "card": "OCBC REWARDS",
+      "card": "OCBC Infinity",
       "qualifying": "Yes"
     },
     {
@@ -402,7 +402,7 @@ DATA = {
       "category": "Food",
       "total": 4.8,
       "my_amt": 4.8,
-      "card": "OCBC REWARDS",
+      "card": "OCBC Infinity",
       "qualifying": "Yes"
     },
     {
@@ -479,7 +479,7 @@ DATA = {
       "category": "Food",
       "total": 0.5,
       "my_amt": 0.5,
-      "card": "OCBC REWARDS",
+      "card": "OCBC Infinity",
       "qualifying": "Yes"
     },
     {
@@ -490,7 +490,7 @@ DATA = {
       "category": "Food",
       "total": 5.8,
       "my_amt": 5.8,
-      "card": "OCBC REWARDS",
+      "card": "OCBC Infinity",
       "qualifying": "Yes"
     },
     {
@@ -534,7 +534,7 @@ DATA = {
       "category": "Food",
       "total": 1.1,
       "my_amt": 1.1,
-      "card": "OCBC REWARDS",
+      "card": "OCBC Infinity",
       "qualifying": "Yes"
     },
     {
@@ -666,7 +666,7 @@ DATA = {
       "category": "Food",
       "total": 4.39,
       "my_amt": 4.39,
-      "card": "OCBC REWARDS",
+      "card": "OCBC Infinity",
       "qualifying": "Yes"
     },
     {
@@ -699,7 +699,7 @@ DATA = {
       "category": "Food",
       "total": 5.3,
       "my_amt": 5.3,
-      "card": "OCBC REWARDS",
+      "card": "OCBC Infinity",
       "qualifying": "Yes"
     },
     {
