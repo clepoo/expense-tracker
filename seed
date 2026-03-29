@@ -1,0 +1,3331 @@
+"""
+seed.py — Run once on Railway to populate the database with historical data.
+Usage: python seed.py
+
+Set DB_PATH env var if needed (defaults to finbot.db).
+Re-running is safe — it clears and re-inserts everything.
+"""
+
+import sqlite3, os, json
+from datetime import datetime
+
+DB_PATH = os.environ.get("DB_PATH", "finbot.db")
+
+DATA = {
+  "transactions": [
+    {
+      "id": 1,
+      "type": "expense",
+      "date": "2026-01-01",
+      "desc": "Costco",
+      "category": "Groceries",
+      "total": 64.37,
+      "my_amt": 64.37,
+      "card": "UOB PPV Contactless",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 2,
+      "type": "expense",
+      "date": "2026-01-01",
+      "desc": "Watsons - Mom",
+      "category": "Shopping",
+      "total": 120.0,
+      "my_amt": 120.0,
+      "card": "OCBC REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 3,
+      "type": "expense",
+      "date": "2026-01-02",
+      "desc": "Shopee - Foot Cream, Earwax Cleaner",
+      "category": "Shopping",
+      "total": 25.41,
+      "my_amt": 25.41,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 4,
+      "type": "expense",
+      "date": "2026-01-04",
+      "desc": "Los Tacos",
+      "category": "Food",
+      "total": 39.15,
+      "my_amt": 39.15,
+      "card": "CITI REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 5,
+      "type": "expense",
+      "date": "2026-01-04",
+      "desc": "Sephora - Eadem Guava Fresca",
+      "category": "Shopping",
+      "total": 0.12,
+      "my_amt": 0.12,
+      "card": "TRUST",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 6,
+      "type": "expense",
+      "date": "2026-01-04",
+      "desc": "Levain Cookie",
+      "category": "Food",
+      "total": 53.23,
+      "my_amt": 53.23,
+      "card": "CITI REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 7,
+      "type": "expense",
+      "date": "2026-01-04",
+      "desc": "Van Lee Wen Ice Cream",
+      "category": "Food",
+      "total": 14.96,
+      "my_amt": 14.96,
+      "card": "CITI REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 8,
+      "type": "expense",
+      "date": "2026-01-05",
+      "desc": "Shoprite - 647 Old Thyme Bread",
+      "category": "Food",
+      "total": 12.07,
+      "my_amt": 12.07,
+      "card": "CITI REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 9,
+      "type": "expense",
+      "date": "2026-01-07",
+      "desc": "Grab from Airport",
+      "category": "Transport",
+      "total": 28.0,
+      "my_amt": 28.0,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 10,
+      "type": "expense",
+      "date": "2026-01-07",
+      "desc": "Foodpanda - Congee",
+      "category": "Food",
+      "total": 16.7,
+      "my_amt": 16.7,
+      "card": "CITI REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 11,
+      "type": "expense",
+      "date": "2026-01-08",
+      "desc": "Six Hands",
+      "category": "Food",
+      "total": 13.95,
+      "my_amt": 13.95,
+      "card": "CITI REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 12,
+      "type": "expense",
+      "date": "2026-01-08",
+      "desc": "Luckin Coffee",
+      "category": "Food",
+      "total": 5.6,
+      "my_amt": 5.6,
+      "card": "UOB PPV Contactless",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 13,
+      "type": "expense",
+      "date": "2026-01-08",
+      "desc": "Beauty And The Beast Musical",
+      "category": "Entertainment",
+      "total": 174.8,
+      "my_amt": 87.4,
+      "card": "DBS WWMC",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 14,
+      "type": "expense",
+      "date": "2026-01-09",
+      "desc": "Cold Storage - Candy",
+      "category": "Food",
+      "total": 8.9,
+      "my_amt": 8.9,
+      "card": "TRUST",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 15,
+      "type": "expense",
+      "date": "2026-01-09",
+      "desc": "Eva Air - Waitlist JFK -> SIN",
+      "category": "Travel",
+      "total": 269.45,
+      "my_amt": 269.45,
+      "card": "DBS WWMC",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 16,
+      "type": "expense",
+      "date": "2026-01-10",
+      "desc": "Eagle Eye Consultation and Check Up",
+      "category": "Health, Beauty & Wellness",
+      "total": 409.3,
+      "my_amt": 55.8,
+      "card": "UOB PPV Contactless",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 17,
+      "type": "expense",
+      "date": "2026-01-10",
+      "desc": "Cedric Grolet",
+      "category": "Food",
+      "total": 4.0,
+      "my_amt": 4.0,
+      "card": "TRUST",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 18,
+      "type": "expense",
+      "date": "2026-01-10",
+      "desc": "Become Aesthetics",
+      "category": "Health, Beauty & Wellness",
+      "total": 495.83,
+      "my_amt": 495.83,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 19,
+      "type": "expense",
+      "date": "2026-01-10",
+      "desc": "Become Aesthetics",
+      "category": "Health, Beauty & Wellness",
+      "total": 99.17,
+      "my_amt": 99.17,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 20,
+      "type": "expense",
+      "date": "2026-01-10",
+      "desc": "Crepe",
+      "category": "Food",
+      "total": 30.14,
+      "my_amt": 30.14,
+      "card": "Cash",
+      "qualifying": "No"
+    },
+    {
+      "id": 21,
+      "type": "expense",
+      "date": "2026-01-10",
+      "desc": "Taobao - Le Labo Diffuser (To Sell), Make Up Pouch, Airpods Case",
+      "category": "Shopping",
+      "total": 47.24,
+      "my_amt": 10.74,
+      "card": "OCBC REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 22,
+      "type": "expense",
+      "date": "2026-01-12",
+      "desc": "Become Aesthetics",
+      "category": "Health, Beauty & Wellness",
+      "total": 148.5,
+      "my_amt": 148.5,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 23,
+      "type": "expense",
+      "date": "2026-01-12",
+      "desc": "Become Aesthetics",
+      "category": "Health, Beauty & Wellness",
+      "total": 147.49,
+      "my_amt": 147.49,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 24,
+      "type": "expense",
+      "date": "2026-01-12",
+      "desc": "Chagee",
+      "category": "Food",
+      "total": 5.5,
+      "my_amt": 5.5,
+      "card": "CITI REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 25,
+      "type": "expense",
+      "date": "2026-01-15",
+      "desc": "Oatsome",
+      "category": "Food",
+      "total": 64.0,
+      "my_amt": 32.0,
+      "card": "UOB PPV Contactless",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 26,
+      "type": "expense",
+      "date": "2026-01-15",
+      "desc": "Roberta's Pizza",
+      "category": "Food",
+      "total": 44.36,
+      "my_amt": 22.36,
+      "card": "UOB PPV Contactless",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 27,
+      "type": "expense",
+      "date": "2026-01-16",
+      "desc": "Smile Dental - Wisdom",
+      "category": "Health, Beauty & Wellness",
+      "total": 80.0,
+      "my_amt": 80.0,
+      "card": "UOB PPV Contactless",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 28,
+      "type": "expense",
+      "date": "2026-01-17",
+      "desc": "Become Aesthetics",
+      "category": "Health, Beauty & Wellness",
+      "total": 198.33,
+      "my_amt": 198.33,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 29,
+      "type": "expense",
+      "date": "2026-01-17",
+      "desc": "Become Aesthetics",
+      "category": "Health, Beauty & Wellness",
+      "total": 198.33,
+      "my_amt": 198.33,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 30,
+      "type": "expense",
+      "date": "2026-01-17",
+      "desc": "Shopee - Vivid Kitchen Sauce, D'alba Spray",
+      "category": "Shopping",
+      "total": 33.01,
+      "my_amt": 33.01,
+      "card": "OCBC REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 31,
+      "type": "expense",
+      "date": "2026-01-17",
+      "desc": "Foodpanda - Abalone Porridge, Kimchi Pancake",
+      "category": "Food",
+      "total": 24.48,
+      "my_amt": 24.48,
+      "card": "OCBC Infinity",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 32,
+      "type": "expense",
+      "date": "2026-01-17",
+      "desc": "Become Aesthetics",
+      "category": "Health, Beauty & Wellness",
+      "total": 99.17,
+      "my_amt": 99.17,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 33,
+      "type": "expense",
+      "date": "2026-01-18",
+      "desc": "Singtel - Phone Bill",
+      "category": "Bills",
+      "total": 15.28,
+      "my_amt": 15.28,
+      "card": "TRUST",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 34,
+      "type": "expense",
+      "date": "2026-01-22",
+      "desc": "Dempsey - Culina, Curly's, Supernature",
+      "category": "Food",
+      "total": 53.3,
+      "my_amt": 53.3,
+      "card": "Cash",
+      "qualifying": "No"
+    },
+    {
+      "id": 35,
+      "type": "expense",
+      "date": "2026-01-23",
+      "desc": "Herbal Tea",
+      "category": "Food",
+      "total": 4.5,
+      "my_amt": 4.5,
+      "card": "Cash",
+      "qualifying": "No"
+    },
+    {
+      "id": 36,
+      "type": "expense",
+      "date": "2026-01-23",
+      "desc": "Chou Niang Mochi",
+      "category": "Food",
+      "total": 4.8,
+      "my_amt": 4.8,
+      "card": "OCBC Infinity",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 37,
+      "type": "expense",
+      "date": "2026-01-23",
+      "desc": "Cold Storage",
+      "category": "Food",
+      "total": 8.9,
+      "my_amt": 8.9,
+      "card": "UOB PRIVI",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 38,
+      "type": "expense",
+      "date": "2026-01-23",
+      "desc": "Watsons - Ear Plug",
+      "category": "Shopping",
+      "total": 9.9,
+      "my_amt": 9.9,
+      "card": "OCBC REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 39,
+      "type": "expense",
+      "date": "2026-01-24",
+      "desc": "Shopee - Medicube Booster Pro Mini",
+      "category": "Shopping",
+      "total": 9.0,
+      "my_amt": 9.0,
+      "card": "OCBC REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 40,
+      "type": "expense",
+      "date": "2026-01-26",
+      "desc": "Club21",
+      "category": "Shopping",
+      "total": 14.0,
+      "my_amt": 14.0,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 41,
+      "type": "expense",
+      "date": "2026-01-26",
+      "desc": "Club21",
+      "category": "Shopping",
+      "total": 28.8,
+      "my_amt": 28.8,
+      "card": "OCBC REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 42,
+      "type": "expense",
+      "date": "2026-01-26",
+      "desc": "Laderach",
+      "category": "Food",
+      "total": 11.0,
+      "my_amt": 11.0,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 43,
+      "type": "expense",
+      "date": "2026-01-26",
+      "desc": "Luckin Coffee",
+      "category": "Food",
+      "total": 0.5,
+      "my_amt": 0.5,
+      "card": "OCBC Infinity",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 44,
+      "type": "expense",
+      "date": "2026-01-28",
+      "desc": "Foodpanda - Amacha + Cedele",
+      "category": "Food",
+      "total": 5.8,
+      "my_amt": 5.8,
+      "card": "OCBC Infinity",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 45,
+      "type": "expense",
+      "date": "2026-01-28",
+      "desc": "Laderach",
+      "category": "Food",
+      "total": 8.3,
+      "my_amt": 8.3,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 46,
+      "type": "expense",
+      "date": "2026-01-28",
+      "desc": "M&S",
+      "category": "Food",
+      "total": 3.9,
+      "my_amt": 3.9,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 47,
+      "type": "expense",
+      "date": "2026-01-29",
+      "desc": "More Yogurt",
+      "category": "Food",
+      "total": 8.71,
+      "my_amt": 8.71,
+      "card": "TRUST",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 48,
+      "type": "expense",
+      "date": "2026-01-30",
+      "desc": "Foodpanda - Kyuhei",
+      "category": "Food",
+      "total": 1.1,
+      "my_amt": 1.1,
+      "card": "OCBC Infinity",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 49,
+      "type": "expense",
+      "date": "2026-01-30",
+      "desc": "Fairprice - Scallops x6",
+      "category": "Groceries",
+      "total": 151.01,
+      "my_amt": 151.01,
+      "card": "TRUST",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 50,
+      "type": "expense",
+      "date": "2026-01-30",
+      "desc": "Munchi Pancakes",
+      "category": "Food",
+      "total": 2.0,
+      "my_amt": 2.0,
+      "card": "UOB PRIVI",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 51,
+      "type": "expense",
+      "date": "2026-02-01",
+      "desc": "Become Aesthetics",
+      "category": "Health, Beauty & Wellness",
+      "total": 991.66,
+      "my_amt": 991.66,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 52,
+      "type": "expense",
+      "date": "2026-02-01",
+      "desc": "Become Aesthetics",
+      "category": "Health, Beauty & Wellness",
+      "total": 396.66,
+      "my_amt": 396.66,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 53,
+      "type": "expense",
+      "date": "2026-02-02",
+      "desc": "Protego Wow Noodles",
+      "category": "Groceries",
+      "total": 77.83,
+      "my_amt": 77.83,
+      "card": "CITI REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 54,
+      "type": "expense",
+      "date": "2026-02-02",
+      "desc": "Taobao - LP Shoe, Guasha, Iphone Screen Protector",
+      "category": "Shopping",
+      "total": 109.17,
+      "my_amt": 109.17,
+      "card": "OCBC REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 55,
+      "type": "expense",
+      "date": "2026-02-02",
+      "desc": "Shopee - Deodorant, Bidet Spray, Carrot Spiralizer, D'alba Mask",
+      "category": "Shopping",
+      "total": 41.98,
+      "my_amt": 41.98,
+      "card": "OCBC REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 56,
+      "type": "expense",
+      "date": "2026-02-02",
+      "desc": "Steam - Where Winds Meet Monthly Fund",
+      "category": "Entertainment",
+      "total": 6.58,
+      "my_amt": 6.58,
+      "card": "CITI REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 57,
+      "type": "expense",
+      "date": "2026-02-02",
+      "desc": "Shopee - Allulose",
+      "category": "Shopping",
+      "total": 27.71,
+      "my_amt": 10.46,
+      "card": "OCBC REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 58,
+      "type": "expense",
+      "date": "2026-02-02",
+      "desc": "Steam - Where Winds Meet 900 Coins",
+      "category": "Entertainment",
+      "total": 19.9,
+      "my_amt": 19.9,
+      "card": "CITI REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 59,
+      "type": "expense",
+      "date": "2026-02-03",
+      "desc": "Foodpanda - PPP Coffee",
+      "category": "Food",
+      "total": 4.39,
+      "my_amt": 4.39,
+      "card": "OCBC Infinity",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 60,
+      "type": "expense",
+      "date": "2026-02-04",
+      "desc": "Scoot (HK)",
+      "category": "Travel",
+      "total": 352.08,
+      "my_amt": 352.08,
+      "card": "DBS WWMC",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 61,
+      "type": "expense",
+      "date": "2026-02-04",
+      "desc": "Trip.com Hotel (HK)",
+      "category": "Travel",
+      "total": 215.93,
+      "my_amt": 215.93,
+      "card": "DBS WWMC",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 62,
+      "type": "expense",
+      "date": "2026-02-06",
+      "desc": "Foodpanda - Amacha + Waffle",
+      "category": "Food",
+      "total": 5.3,
+      "my_amt": 5.3,
+      "card": "OCBC Infinity",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 63,
+      "type": "expense",
+      "date": "2026-02-06",
+      "desc": "Grab Home",
+      "category": "Transport",
+      "total": 19.8,
+      "my_amt": 19.8,
+      "card": "DBS WWMC",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 64,
+      "type": "expense",
+      "date": "2026-02-07",
+      "desc": "Home Dusk",
+      "category": "Food",
+      "total": 103.6,
+      "my_amt": 103.6,
+      "card": "Cash",
+      "qualifying": "No"
+    },
+    {
+      "id": 65,
+      "type": "expense",
+      "date": "2026-02-09",
+      "desc": "Humpback Oyster",
+      "category": "Food",
+      "total": 87.53,
+      "my_amt": 44.03,
+      "card": "UOB PPV Contactless",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 66,
+      "type": "expense",
+      "date": "2026-02-11",
+      "desc": "Compose Coffee",
+      "category": "Food",
+      "total": 10.71,
+      "my_amt": 2.38,
+      "card": "DBS WWMC",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 67,
+      "type": "expense",
+      "date": "2026-02-13",
+      "desc": "Saboten Tonkatsu",
+      "category": "Food",
+      "total": 159.47,
+      "my_amt": 15.47,
+      "card": "CITI REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 68,
+      "type": "expense",
+      "date": "2026-02-13",
+      "desc": "Joma Shop - Nishane Wulong Cha",
+      "category": "Shopping",
+      "total": 374.76,
+      "my_amt": 169.76,
+      "card": "CITI REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 69,
+      "type": "expense",
+      "date": "2026-02-13",
+      "desc": "La Maison Du Chocolat (Valentines Gift)",
+      "category": "Shopping",
+      "total": 130.69,
+      "my_amt": 130.69,
+      "card": "CITI REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 70,
+      "type": "expense",
+      "date": "2026-02-13",
+      "desc": "Mcdonalds Coke Zero",
+      "category": "Food",
+      "total": 3.9,
+      "my_amt": 3.9,
+      "card": "UOB PRIVI",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 71,
+      "type": "expense",
+      "date": "2026-02-19",
+      "desc": "Compose Coffee",
+      "category": "Food",
+      "total": 3.3,
+      "my_amt": 3.3,
+      "card": "UOB PRIVI",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 72,
+      "type": "expense",
+      "date": "2026-02-21",
+      "desc": "TCM - Medications",
+      "category": "Health, Beauty & Wellness",
+      "total": 40.0,
+      "my_amt": 5.0,
+      "card": "Cash",
+      "qualifying": "No"
+    },
+    {
+      "id": 73,
+      "type": "expense",
+      "date": "2026-02-21",
+      "desc": "Shopee - Metagreen + etc",
+      "category": "Shopping",
+      "total": 4.05,
+      "my_amt": 4.05,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 74,
+      "type": "expense",
+      "date": "2026-02-22",
+      "desc": "TeaFlight (KUL <-> SIN)",
+      "category": "Travel",
+      "total": 191.0,
+      "my_amt": 191.0,
+      "card": "DBS WWMC",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 75,
+      "type": "expense",
+      "date": "2026-02-23",
+      "desc": "TCM Package",
+      "category": "Health, Beauty & Wellness",
+      "total": 500.0,
+      "my_amt": 500.0,
+      "card": "UOB PPV Contactless",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 76,
+      "type": "expense",
+      "date": "2026-02-24",
+      "desc": "Mediya - Salmon Sashimi",
+      "category": "Food",
+      "total": 18.55,
+      "my_amt": 18.55,
+      "card": "UOB PRIVI",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 77,
+      "type": "expense",
+      "date": "2026-02-24",
+      "desc": "Cold Storage - Gummies",
+      "category": "Food",
+      "total": 2.55,
+      "my_amt": 2.55,
+      "card": "UOB PRIVI",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 78,
+      "type": "expense",
+      "date": "2026-02-25",
+      "desc": "Shopee - Chicken Breast Ham x6",
+      "category": "Groceries",
+      "total": 29.92,
+      "my_amt": 29.92,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 79,
+      "type": "expense",
+      "date": "2026-02-25",
+      "desc": "Taobao - Clothes, Miu Jacket (Refunded), Alo Pants",
+      "category": "Shopping",
+      "total": 130.57,
+      "my_amt": 130.07,
+      "card": "OCBC REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 80,
+      "type": "expense",
+      "date": "2026-02-25",
+      "desc": "Shopee - Metagreen + Coffee Xylitol Candy",
+      "category": "Health, Beauty & Wellness",
+      "total": 22.4,
+      "my_amt": 22.4,
+      "card": "OCBC REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 81,
+      "type": "expense",
+      "date": "2026-02-25",
+      "desc": "Starbucks Top Up",
+      "category": "Food",
+      "total": 10.0,
+      "my_amt": 6.7,
+      "card": "UOB PRIVI",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 82,
+      "type": "expense",
+      "date": "2026-02-25",
+      "desc": "Claude AI",
+      "category": "Bills",
+      "total": 30.0,
+      "my_amt": 30.0,
+      "card": "DBS WWMC",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 83,
+      "type": "expense",
+      "date": "2026-02-26",
+      "desc": "TCM - Medications",
+      "category": "Health, Beauty & Wellness",
+      "total": 40.0,
+      "my_amt": 5.0,
+      "card": "Cash",
+      "qualifying": "No"
+    },
+    {
+      "id": 84,
+      "type": "expense",
+      "date": "2026-02-27",
+      "desc": "Alipay - Breguet Watch + Miu Hoodie",
+      "category": "Shopping",
+      "total": 311.68,
+      "my_amt": 311.68,
+      "card": "CITI REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 85,
+      "type": "expense",
+      "date": "2026-02-28",
+      "desc": "Singtel - Phone Bill",
+      "category": "Bills",
+      "total": 39.48,
+      "my_amt": 39.48,
+      "card": "Cash",
+      "qualifying": "No"
+    },
+    {
+      "id": 86,
+      "type": "expense",
+      "date": "2026-03-01",
+      "desc": "Shopee - Aestura (Andrew)",
+      "category": "Shopping",
+      "total": 20.04,
+      "my_amt": 20.04,
+      "card": "OCBC REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 87,
+      "type": "expense",
+      "date": "2026-03-01",
+      "desc": "Alipay - Breguet Watch + Miu Hoodie",
+      "category": "Shopping",
+      "total": 100.53,
+      "my_amt": 100.53,
+      "card": "OCBC REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 88,
+      "type": "expense",
+      "date": "2026-03-01",
+      "desc": "Taobao - Miu Sunglasses, Invis Ultrasonic Cleaner, Off Shoulder Top",
+      "category": "Shopping",
+      "total": 118.18,
+      "my_amt": 118.18,
+      "card": "OCBC REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 89,
+      "type": "expense",
+      "date": "2026-03-01",
+      "desc": "Shopee - Kelp Noodles, Food Art Soup",
+      "category": "Shopping",
+      "total": 20.19,
+      "my_amt": 20.19,
+      "card": "OCBC REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 90,
+      "type": "expense",
+      "date": "2026-03-02",
+      "desc": "Compose Coffee",
+      "category": "Food",
+      "total": 9.3,
+      "my_amt": 3.3,
+      "card": "CITI REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 91,
+      "type": "expense",
+      "date": "2026-03-02",
+      "desc": "Humpback Oyster",
+      "category": "Food",
+      "total": 93.52,
+      "my_amt": 46.76,
+      "card": "UOB PPV Contactless",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 92,
+      "type": "expense",
+      "date": "2026-03-02",
+      "desc": "Shopee - Dr Get IT Glutathione Whitening x4",
+      "category": "Health, Beauty & Wellness",
+      "total": 86.0,
+      "my_amt": 86.0,
+      "card": "OCBC REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 93,
+      "type": "expense",
+      "date": "2026-03-03",
+      "desc": "Shopee - Coffee Candy, Kelp Noodle, HK Esim",
+      "category": "Shopping",
+      "total": 24.69,
+      "my_amt": 24.69,
+      "card": "OCBC REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 94,
+      "type": "expense",
+      "date": "2026-03-03",
+      "desc": "Shopee - Sterra Y Filter",
+      "category": "Bills",
+      "total": 94.38,
+      "my_amt": 94.38,
+      "card": "OCBC REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 95,
+      "type": "expense",
+      "date": "2026-03-03",
+      "desc": "Sterra - Filter Replacement Service",
+      "category": "Bills",
+      "total": 105.0,
+      "my_amt": 105.0,
+      "card": "OCBC REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 96,
+      "type": "expense",
+      "date": "2026-03-03",
+      "desc": "Shopee - Metagreen Booster, Mouth Rinse",
+      "category": "Shopping",
+      "total": 34.43,
+      "my_amt": 34.43,
+      "card": "OCBC REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 97,
+      "type": "expense",
+      "date": "2026-03-03",
+      "desc": "Wawa Lala ",
+      "category": "Food",
+      "total": 10.0,
+      "my_amt": 10.0,
+      "card": "Cash",
+      "qualifying": "No"
+    },
+    {
+      "id": 98,
+      "type": "expense",
+      "date": "2026-03-03",
+      "desc": "Become Aesthetics - 5X HIFU, 3X Sylfirm X",
+      "category": "Health, Beauty & Wellness",
+      "total": 496.66,
+      "my_amt": 496.66,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 99,
+      "type": "expense",
+      "date": "2026-03-04",
+      "desc": "TCM - Medications",
+      "category": "Health, Beauty & Wellness",
+      "total": 40.0,
+      "my_amt": 5.0,
+      "card": "Cash",
+      "qualifying": "No"
+    },
+    {
+      "id": 100,
+      "type": "expense",
+      "date": "2026-03-04",
+      "desc": "Shopee - Tangle Angel Mini",
+      "category": "Shopping",
+      "total": 8.58,
+      "my_amt": 8.58,
+      "card": "OCBC REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 101,
+      "type": "expense",
+      "date": "2026-03-04",
+      "desc": "Chagee",
+      "category": "Food",
+      "total": 10.5,
+      "my_amt": 4.6,
+      "card": "CITI REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 102,
+      "type": "expense",
+      "date": "2026-03-04",
+      "desc": "TCM",
+      "category": "Health, Beauty & Wellness",
+      "total": 40.0,
+      "my_amt": 5.0,
+      "card": "Cash",
+      "qualifying": "No"
+    },
+    {
+      "id": 103,
+      "type": "expense",
+      "date": "2026-03-05",
+      "desc": "SGD to HKD",
+      "category": "Shopping",
+      "total": 164.2,
+      "my_amt": 164.2,
+      "card": "Cash",
+      "qualifying": "No"
+    },
+    {
+      "id": 104,
+      "type": "expense",
+      "date": "2026-03-07",
+      "desc": "100 Plus Zero",
+      "category": "Food",
+      "total": 3.0,
+      "my_amt": 3.0,
+      "card": "UOB PRIVI",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 105,
+      "type": "expense",
+      "date": "2026-03-07",
+      "desc": "Uber to Hotel",
+      "category": "Transport",
+      "total": 43.27,
+      "my_amt": 43.27,
+      "card": "UOB VS FCY",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 106,
+      "type": "expense",
+      "date": "2026-03-07",
+      "desc": "Coconut Candy",
+      "category": "Food",
+      "total": 14.4,
+      "my_amt": 14.4,
+      "card": "UOB VS FCY",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 107,
+      "type": "expense",
+      "date": "2026-03-07",
+      "desc": "Muji Tie Guan Yin Chocolate",
+      "category": "Food",
+      "total": 27.11,
+      "my_amt": 27.11,
+      "card": "UOB VS FCY",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 108,
+      "type": "expense",
+      "date": "2026-03-07",
+      "desc": "Market Place Drinks",
+      "category": "Food",
+      "total": 10.34,
+      "my_amt": 10.34,
+      "card": "UOB VS FCY",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 109,
+      "type": "expense",
+      "date": "2026-03-07",
+      "desc": "Lung Shin Medicine",
+      "category": "Shopping",
+      "total": 23.05,
+      "my_amt": 23.05,
+      "card": "UOB VS FCY",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 110,
+      "type": "expense",
+      "date": "2026-03-07",
+      "desc": "MTR Rides",
+      "category": "Transport",
+      "total": 8.98,
+      "my_amt": 8.98,
+      "card": "UOB VS FCY",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 111,
+      "type": "expense",
+      "date": "2026-03-08",
+      "desc": "Bakehouse Egg Tarts",
+      "category": "Food",
+      "total": 49.81,
+      "my_amt": 49.81,
+      "card": "UOB VS FCY",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 112,
+      "type": "expense",
+      "date": "2026-03-08",
+      "desc": "Cartier",
+      "category": "Shopping",
+      "total": 466.58,
+      "my_amt": 466.58,
+      "card": "CITI REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 113,
+      "type": "expense",
+      "date": "2026-03-08",
+      "desc": "Yuet Beauty - Onda Pro 2 Parts",
+      "category": "Health, Beauty & Wellness",
+      "total": 181.2,
+      "my_amt": 181.2,
+      "card": "CITI REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 114,
+      "type": "expense",
+      "date": "2026-03-08",
+      "desc": "Fook Hai Jewellery - White Gold Diamond Earrings",
+      "category": "Shopping",
+      "total": 847.15,
+      "my_amt": 847.15,
+      "card": "UOB VS FCY",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 115,
+      "type": "expense",
+      "date": "2026-03-08",
+      "desc": "Duddell's Goose Rice",
+      "category": "Food",
+      "total": 27.44,
+      "my_amt": 27.44,
+      "card": "UOB VS FCY",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 116,
+      "type": "expense",
+      "date": "2026-03-10",
+      "desc": "Compose Coffee",
+      "category": "Food",
+      "total": 3.3,
+      "my_amt": 3.3,
+      "card": "UOB PRIVI",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 117,
+      "type": "expense",
+      "date": "2026-03-10",
+      "desc": "Cold Storage - Yogurt, Milk",
+      "category": "Groceries",
+      "total": 3.75,
+      "my_amt": 3.75,
+      "card": "UOB PRIVI",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 118,
+      "type": "expense",
+      "date": "2026-03-10",
+      "desc": "Invisalign Deposit",
+      "category": "Health, Beauty & Wellness",
+      "total": 450.0,
+      "my_amt": 450.0,
+      "card": "UOB PPV Contactless",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 119,
+      "type": "expense",
+      "date": "2026-03-10",
+      "desc": "Invisalign Deposit",
+      "category": "Health, Beauty & Wellness",
+      "total": 1200.0,
+      "my_amt": 1200.0,
+      "card": "UOB VS SGD",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 120,
+      "type": "expense",
+      "date": "2026-03-10",
+      "desc": "Invisalign Deposit",
+      "category": "Health, Beauty & Wellness",
+      "total": 352.0,
+      "my_amt": 355.52,
+      "card": "CITI REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 121,
+      "type": "expense",
+      "date": "2026-03-10",
+      "desc": "Invisalign Deposit",
+      "category": "Health, Beauty & Wellness",
+      "total": 505.0,
+      "my_amt": 505.0,
+      "card": "UOB PRIVI",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 122,
+      "type": "expense",
+      "date": "2026-03-11",
+      "desc": "Compose Coffee",
+      "category": "Food",
+      "total": 8.1,
+      "my_amt": 3.3,
+      "card": "UOB PRIVI",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 123,
+      "type": "expense",
+      "date": "2026-03-11",
+      "desc": "U Aesthetic Onda Pro Trial Deposit",
+      "category": "Health, Beauty & Wellness",
+      "total": 32.7,
+      "my_amt": 32.7,
+      "card": "DBS WWMC",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 124,
+      "type": "expense",
+      "date": "2026-03-12",
+      "desc": "Compose Coffee",
+      "category": "Food",
+      "total": 8.1,
+      "my_amt": 3.3,
+      "card": "UOB PRIVI",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 125,
+      "type": "expense",
+      "date": "2026-03-13",
+      "desc": "Compose Coffee",
+      "category": "Food",
+      "total": 6.6,
+      "my_amt": 3.3,
+      "card": "UOB PRIVI",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 126,
+      "type": "expense",
+      "date": "2026-03-13",
+      "desc": "Pawa Bakery Honey Garlic Toast",
+      "category": "Food",
+      "total": 6.8,
+      "my_amt": 6.8,
+      "card": "UOB PRIVI",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 127,
+      "type": "expense",
+      "date": "2026-03-15",
+      "desc": "Become Aesthetics",
+      "category": "Health, Beauty & Wellness",
+      "total": 198.33,
+      "my_amt": 198.33,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 128,
+      "type": "expense",
+      "date": "2026-04-02",
+      "desc": "Become Aesthetics - 5X HIFU, 3X Sylfirm X",
+      "category": "Health, Beauty & Wellness",
+      "total": 496.66,
+      "my_amt": 496.66,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 129,
+      "type": "expense",
+      "date": "2026-04-10",
+      "desc": "Become Aesthetics",
+      "category": "Health, Beauty & Wellness",
+      "total": 495.83,
+      "my_amt": 495.83,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 130,
+      "type": "expense",
+      "date": "2026-05-02",
+      "desc": "Become Aesthetics - 5X HIFU, 3X Sylfirm X",
+      "category": "Health, Beauty & Wellness",
+      "total": 496.66,
+      "my_amt": 496.66,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 131,
+      "type": "expense",
+      "date": "2026-05-10",
+      "desc": "Become Aesthetics",
+      "category": "Health, Beauty & Wellness",
+      "total": 495.83,
+      "my_amt": 495.83,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 132,
+      "type": "expense",
+      "date": "2026-06-01",
+      "desc": "Become Aesthetics - 5X HIFU, 3X Sylfirm X",
+      "category": "Health, Beauty & Wellness",
+      "total": 496.66,
+      "my_amt": 496.66,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 133,
+      "type": "expense",
+      "date": "2026-06-09",
+      "desc": "Become Aesthetics",
+      "category": "Health, Beauty & Wellness",
+      "total": 495.83,
+      "my_amt": 495.83,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 134,
+      "type": "expense",
+      "date": "2026-07-01",
+      "desc": "Become Aesthetics - 5X HIFU, 3X Sylfirm X",
+      "category": "Health, Beauty & Wellness",
+      "total": 496.66,
+      "my_amt": 496.66,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 135,
+      "type": "expense",
+      "date": "2026-08-01",
+      "desc": "Become Aesthetics - 5X HIFU, 3X Sylfirm X",
+      "category": "Health, Beauty & Wellness",
+      "total": 496.66,
+      "my_amt": 496.66,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 136,
+      "type": "expense",
+      "date": "2026-03-15",
+      "desc": "Taobao - Work Pants, Top, Toothbrush, Bottle Cleaner, Luggage Tag, Misc",
+      "category": "Shopping",
+      "total": 77.88,
+      "my_amt": 77.88,
+      "card": "OCBC REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 137,
+      "type": "expense",
+      "date": "2026-03-15",
+      "desc": "Taobao - Hermes Belt",
+      "category": "Shopping",
+      "total": 21.16,
+      "my_amt": 21.16,
+      "card": "OCBC REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 138,
+      "type": "expense",
+      "date": "2026-03-16",
+      "desc": "Compose Coffee",
+      "category": "Food",
+      "total": 9.9,
+      "my_amt": 3.3,
+      "card": "DBS WWMC",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 139,
+      "type": "expense",
+      "date": "2026-03-16",
+      "desc": "Grab Home from Office",
+      "category": "Transport",
+      "total": 25.0,
+      "my_amt": 25.0,
+      "card": "DBS WWMC",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 140,
+      "type": "expense",
+      "date": "2026-03-17",
+      "desc": "Compose Coffee",
+      "category": "Food",
+      "total": 6.6,
+      "my_amt": 3.3,
+      "card": "DBS WWMC",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 141,
+      "type": "expense",
+      "date": "2026-03-18",
+      "desc": "Compose Coffee",
+      "category": "Food",
+      "total": 12.3,
+      "my_amt": 3.3,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 142,
+      "type": "expense",
+      "date": "2026-03-19",
+      "desc": "Compose Coffee",
+      "category": "Food",
+      "total": 6.6,
+      "my_amt": 3.3,
+      "card": "DBS WWMC",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 143,
+      "type": "expense",
+      "date": "2026-03-19",
+      "desc": "Grab Home from Office",
+      "category": "Transport",
+      "total": 11.9,
+      "my_amt": 11.9,
+      "card": "DBS WWMC",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 144,
+      "type": "expense",
+      "date": "2026-03-18",
+      "desc": "Onggii Korean Food",
+      "category": "Food",
+      "total": 22.6,
+      "my_amt": 22.6,
+      "card": "DBS WWMC",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 145,
+      "type": "expense",
+      "date": "2026-03-18",
+      "desc": "Have Fun KTV",
+      "category": "Entertainment",
+      "total": 18.0,
+      "my_amt": 18.0,
+      "card": "Cash",
+      "qualifying": "No"
+    },
+    {
+      "id": 146,
+      "type": "expense",
+      "date": "2026-03-20",
+      "desc": "Loreal Friend's and Family",
+      "category": "Shopping",
+      "total": 669.91,
+      "my_amt": 669.91,
+      "card": "DBS WWMC",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 147,
+      "type": "expense",
+      "date": "2026-03-20",
+      "desc": "Loreal Friend's and Family",
+      "category": "Shopping",
+      "total": 183.95,
+      "my_amt": 55.45,
+      "card": "DBS WWMC",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 148,
+      "type": "expense",
+      "date": "2026-03-20",
+      "desc": "Compose Coffee",
+      "category": "Food",
+      "total": 8.6,
+      "my_amt": 5.3,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 149,
+      "type": "expense",
+      "date": "2026-03-20",
+      "desc": "Panda Chan Snack",
+      "category": "Food",
+      "total": 15.7,
+      "my_amt": 15.7,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 150,
+      "type": "expense",
+      "date": "2026-03-22",
+      "desc": "McDonald's",
+      "category": "Food",
+      "total": 5.4,
+      "my_amt": 3.0,
+      "card": "UOB PRIVI",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 151,
+      "type": "expense",
+      "date": "2026-03-24",
+      "desc": "Compose Coffee",
+      "category": "Food",
+      "total": 13.2,
+      "my_amt": 3.3,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 152,
+      "type": "expense",
+      "date": "2026-03-24",
+      "desc": "Shopee - Lutein",
+      "category": "Shopping",
+      "total": 20.68,
+      "my_amt": 20.68,
+      "card": "OCBC REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 153,
+      "type": "expense",
+      "date": "2026-03-24",
+      "desc": "Grab Home from Office",
+      "category": "Transport",
+      "total": 17.8,
+      "my_amt": 17.8,
+      "card": "DBS WWMC",
+      "qualifying": "Yes"
+    }
+  ],
+  "sales": [
+    {
+      "id": 1,
+      "date": "2023-11-01",
+      "desc": "VP9 Flowerpot Lamp",
+      "revenue": 70.0,
+      "cost": 41.6,
+      "profit": 28.4
+    },
+    {
+      "id": 2,
+      "date": "2023-11-01",
+      "desc": "VP9 Flowerpot Lamp",
+      "revenue": 70.0,
+      "cost": 41.6,
+      "profit": 28.4
+    },
+    {
+      "id": 3,
+      "date": "2023-11-02",
+      "desc": "xiaomi ir universal controller",
+      "revenue": 10.0,
+      "cost": 0,
+      "profit": 10.0
+    },
+    {
+      "id": 4,
+      "date": "2023-11-02",
+      "desc": "VP9 Flowerpot Lamp",
+      "revenue": 70.0,
+      "cost": 41.6,
+      "profit": 28.4
+    },
+    {
+      "id": 5,
+      "date": "2023-11-05",
+      "desc": "VP9 Flowerpot Lamp",
+      "revenue": 60.0,
+      "cost": 41.6,
+      "profit": 18.4
+    },
+    {
+      "id": 6,
+      "date": "2023-11-06",
+      "desc": "amazon alexa fire cube",
+      "revenue": 80.0,
+      "cost": 0,
+      "profit": 80.0
+    },
+    {
+      "id": 7,
+      "date": "2023-11-09",
+      "desc": "VP9 Flowerpot Lamp",
+      "revenue": 80.0,
+      "cost": 41.6,
+      "profit": 38.4
+    },
+    {
+      "id": 8,
+      "date": "2023-11-11",
+      "desc": "VP9 Flowerpot Lamp",
+      "revenue": 70.0,
+      "cost": 41.6,
+      "profit": 28.4
+    },
+    {
+      "id": 9,
+      "date": "2023-11-13",
+      "desc": "VP9 Flowerpot Lamp",
+      "revenue": 80.0,
+      "cost": 41.6,
+      "profit": 38.4
+    },
+    {
+      "id": 10,
+      "date": "2023-11-13",
+      "desc": "Amazon Echo Sub",
+      "revenue": 200.0,
+      "cost": 0,
+      "profit": 200.0
+    },
+    {
+      "id": 11,
+      "date": "2023-11-15",
+      "desc": "VP9 Flowerpot Lamp",
+      "revenue": 70.0,
+      "cost": 41.6,
+      "profit": 28.4
+    },
+    {
+      "id": 12,
+      "date": "2023-11-17",
+      "desc": "VP9 Flowerpot Lamp",
+      "revenue": 75.0,
+      "cost": 41.6,
+      "profit": 33.4
+    },
+    {
+      "id": 13,
+      "date": "2023-11-25",
+      "desc": "Borosilicate Lurpak Glass Container",
+      "revenue": 10.0,
+      "cost": 0,
+      "profit": 10.0
+    },
+    {
+      "id": 14,
+      "date": "2023-11-25",
+      "desc": "Sasaki Sake Glass Carafe",
+      "revenue": 50.0,
+      "cost": 4.3,
+      "profit": 45.7
+    },
+    {
+      "id": 15,
+      "date": "2023-11-27",
+      "desc": "Uniqlo satin drape pants (beige)",
+      "revenue": 20.0,
+      "cost": 0,
+      "profit": 20.0
+    },
+    {
+      "id": 16,
+      "date": "2023-12-02",
+      "desc": "Ipad Stand",
+      "revenue": 15.0,
+      "cost": 0,
+      "profit": 15.0
+    },
+    {
+      "id": 17,
+      "date": "2023-12-06",
+      "desc": "Zoom75 Non Flex Cut PCB",
+      "revenue": 60.0,
+      "cost": 0,
+      "profit": 60.0
+    },
+    {
+      "id": 18,
+      "date": "2023-12-12",
+      "desc": "VP9 Flowerpot Lamp",
+      "revenue": 80.0,
+      "cost": 41.6,
+      "profit": 38.4
+    },
+    {
+      "id": 19,
+      "date": "2023-12-27",
+      "desc": "Lululemon Wunderlust Backpack",
+      "revenue": 80.0,
+      "cost": 0,
+      "profit": 80.0
+    },
+    {
+      "id": 20,
+      "date": "2024-01-08",
+      "desc": "Uniqlo satin drape pants (Green)",
+      "revenue": 19.2,
+      "cost": 2.0,
+      "profit": 17.2
+    },
+    {
+      "id": 21,
+      "date": "2024-01-14",
+      "desc": "Adjustable Dumbbells",
+      "revenue": 180.0,
+      "cost": 0,
+      "profit": 180.0
+    },
+    {
+      "id": 22,
+      "date": "2024-01-20",
+      "desc": "Ankle Guard",
+      "revenue": 30.0,
+      "cost": 0,
+      "profit": 30.0
+    },
+    {
+      "id": 23,
+      "date": "2024-01-26",
+      "desc": "Lemaire Croissant Bag",
+      "revenue": 252.0,
+      "cost": 4.3,
+      "profit": 247.7
+    },
+    {
+      "id": 24,
+      "date": "2024-02-04",
+      "desc": "Zara Knit Backless Dress",
+      "revenue": 25.0,
+      "cost": 0,
+      "profit": 25.0
+    },
+    {
+      "id": 25,
+      "date": "2024-02-15",
+      "desc": "Jabra Elite Active 75T",
+      "revenue": 80.0,
+      "cost": 0,
+      "profit": 80.0
+    },
+    {
+      "id": 26,
+      "date": "2024-02-18",
+      "desc": "Hinomi Classic Plus Chair",
+      "revenue": 135.0,
+      "cost": 0,
+      "profit": 135.0
+    },
+    {
+      "id": 27,
+      "date": "2024-02-19",
+      "desc": "Gu Green Cardigan",
+      "revenue": 12.0,
+      "cost": 0,
+      "profit": 12.0
+    },
+    {
+      "id": 28,
+      "date": "2024-02-27",
+      "desc": "Lululemon On My Level 19L Bag",
+      "revenue": 80.0,
+      "cost": 0,
+      "profit": 80.0
+    },
+    {
+      "id": 29,
+      "date": "2024-03-01",
+      "desc": "Nespresso Nomad Cup (300ml)",
+      "revenue": 20.0,
+      "cost": 0,
+      "profit": 20.0
+    },
+    {
+      "id": 30,
+      "date": "2024-03-06",
+      "desc": "Dyson Hairdryer Attachment",
+      "revenue": 20.0,
+      "cost": 0,
+      "profit": 20.0
+    },
+    {
+      "id": 31,
+      "date": "2024-03-06",
+      "desc": "Jellycat Heart Bashful Bunny",
+      "revenue": 50.0,
+      "cost": 0,
+      "profit": 50.0
+    },
+    {
+      "id": 32,
+      "date": "2024-03-06",
+      "desc": "Clip On Red Light",
+      "revenue": 30.0,
+      "cost": 0,
+      "profit": 30.0
+    },
+    {
+      "id": 33,
+      "date": "2024-03-12",
+      "desc": "Phoenix Massage Gun",
+      "revenue": 35.0,
+      "cost": 0,
+      "profit": 35.0
+    },
+    {
+      "id": 34,
+      "date": "2024-03-13",
+      "desc": "Uniqlo U Long Coat",
+      "revenue": 85.0,
+      "cost": 0,
+      "profit": 85.0
+    },
+    {
+      "id": 35,
+      "date": "2024-03-13",
+      "desc": "Macbook Air Box",
+      "revenue": 10.0,
+      "cost": 0,
+      "profit": 10.0
+    },
+    {
+      "id": 36,
+      "date": "2024-03-18",
+      "desc": "Joseph Stacey Pleats bag",
+      "revenue": 42.0,
+      "cost": 0,
+      "profit": 42.0
+    },
+    {
+      "id": 37,
+      "date": "2024-03-25",
+      "desc": "Lululemon Wonder Puff",
+      "revenue": 230.0,
+      "cost": 4.3,
+      "profit": 225.7
+    },
+    {
+      "id": 38,
+      "date": "2024-04-03",
+      "desc": "UGG Slippers",
+      "revenue": 54.5,
+      "cost": 4.3,
+      "profit": 50.2
+    },
+    {
+      "id": 39,
+      "date": "2024-04-06",
+      "desc": "Apple Watch Ultra",
+      "revenue": 630.0,
+      "cost": 0,
+      "profit": 630.0
+    },
+    {
+      "id": 40,
+      "date": "2024-04-07",
+      "desc": "Jellycat Smudge Monkey",
+      "revenue": 66.5,
+      "cost": 19.7,
+      "profit": 46.8
+    },
+    {
+      "id": 41,
+      "date": "2024-04-11",
+      "desc": "Jellycat Tumblie Sheep Dog",
+      "revenue": 40.0,
+      "cost": 0,
+      "profit": 40.0
+    },
+    {
+      "id": 42,
+      "date": "2024-04-11",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 55.0,
+      "cost": 15.13,
+      "profit": 39.87
+    },
+    {
+      "id": 43,
+      "date": "2024-04-15",
+      "desc": "Dyson Hairdryer Stand",
+      "revenue": 50.0,
+      "cost": 0,
+      "profit": 50.0
+    },
+    {
+      "id": 44,
+      "date": "2024-04-16",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 68.0,
+      "cost": 17.16,
+      "profit": 50.84
+    },
+    {
+      "id": 45,
+      "date": "2024-04-17",
+      "desc": "Jellycat Smudge Rabbit Big",
+      "revenue": 90.0,
+      "cost": 30.45,
+      "profit": 59.55
+    },
+    {
+      "id": 46,
+      "date": "2024-04-19",
+      "desc": "Lululemon Mini Shoulder Bag (Pink Mist)",
+      "revenue": 74.5,
+      "cost": 4.3,
+      "profit": 70.2
+    },
+    {
+      "id": 47,
+      "date": "2024-04-19",
+      "desc": "Stand Oil Oblong Bag",
+      "revenue": 90.0,
+      "cost": 0,
+      "profit": 90.0
+    },
+    {
+      "id": 48,
+      "date": "2024-04-24",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 68.0,
+      "cost": 17.16,
+      "profit": 50.84
+    },
+    {
+      "id": 49,
+      "date": "2024-04-27",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 68.0,
+      "cost": 18.02,
+      "profit": 49.98
+    },
+    {
+      "id": 50,
+      "date": "2024-04-30",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 72.5,
+      "cost": 20.3,
+      "profit": 52.2
+    },
+    {
+      "id": 51,
+      "date": "2024-04-30",
+      "desc": "Switcheasy Magsafe 4-in-1 Wireless 15W Fast Charging Station",
+      "revenue": 45.0,
+      "cost": 0,
+      "profit": 45.0
+    },
+    {
+      "id": 52,
+      "date": "2024-05-02",
+      "desc": "Blue Moon Beer Tower x2",
+      "revenue": 20.0,
+      "cost": 0,
+      "profit": 20.0
+    },
+    {
+      "id": 53,
+      "date": "2024-05-02",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 68.0,
+      "cost": 17.22,
+      "profit": 50.78
+    },
+    {
+      "id": 54,
+      "date": "2024-05-07",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 72.5,
+      "cost": 20.68,
+      "profit": 51.82
+    },
+    {
+      "id": 55,
+      "date": "2024-05-09",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 68.0,
+      "cost": 16.38,
+      "profit": 51.62
+    },
+    {
+      "id": 56,
+      "date": "2024-05-10",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 64.0,
+      "cost": 16.38,
+      "profit": 47.62
+    },
+    {
+      "id": 57,
+      "date": "2024-05-10",
+      "desc": "Smart Plug x4",
+      "revenue": 30.0,
+      "cost": 0,
+      "profit": 30.0
+    },
+    {
+      "id": 58,
+      "date": "2024-05-13",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 68.0,
+      "cost": 16.38,
+      "profit": 51.62
+    },
+    {
+      "id": 59,
+      "date": "2024-05-13",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 72.5,
+      "cost": 20.64,
+      "profit": 51.86
+    },
+    {
+      "id": 60,
+      "date": "2024-05-13",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 72.5,
+      "cost": 20.64,
+      "profit": 51.86
+    },
+    {
+      "id": 61,
+      "date": "2024-05-13",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 68.0,
+      "cost": 16.34,
+      "profit": 51.66
+    },
+    {
+      "id": 62,
+      "date": "2024-05-14",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 72.5,
+      "cost": 20.95,
+      "profit": 51.55
+    },
+    {
+      "id": 63,
+      "date": "2024-05-14",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 68.0,
+      "cost": 17.45,
+      "profit": 50.55
+    },
+    {
+      "id": 64,
+      "date": "2024-05-15",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 68.0,
+      "cost": 16.65,
+      "profit": 51.35
+    },
+    {
+      "id": 65,
+      "date": "2024-05-16",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 68.0,
+      "cost": 16.34,
+      "profit": 51.66
+    },
+    {
+      "id": 66,
+      "date": "2024-05-19",
+      "desc": "ONR Electric Bed",
+      "revenue": 500.0,
+      "cost": 200.0,
+      "profit": 300.0
+    },
+    {
+      "id": 67,
+      "date": "2024-05-21",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 72.5,
+      "cost": 20.95,
+      "profit": 51.55
+    },
+    {
+      "id": 68,
+      "date": "2024-05-21",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 72.5,
+      "cost": 20.95,
+      "profit": 51.55
+    },
+    {
+      "id": 69,
+      "date": "2024-05-21",
+      "desc": "Jellycat Snow Dragon Med",
+      "revenue": 102.8,
+      "cost": 8.9,
+      "profit": 93.9
+    },
+    {
+      "id": 70,
+      "date": "2024-05-22",
+      "desc": "Tena Diapers x1",
+      "revenue": 5.0,
+      "cost": 0,
+      "profit": 5.0
+    },
+    {
+      "id": 71,
+      "date": "2024-05-24",
+      "desc": "Tena Diapers x8",
+      "revenue": 40.0,
+      "cost": 0,
+      "profit": 40.0
+    },
+    {
+      "id": 72,
+      "date": "2024-05-24",
+      "desc": "Livedry Diapers x10",
+      "revenue": 40.0,
+      "cost": 0,
+      "profit": 40.0
+    },
+    {
+      "id": 73,
+      "date": "2024-05-27",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 68.0,
+      "cost": 16.34,
+      "profit": 51.66
+    },
+    {
+      "id": 74,
+      "date": "2024-05-29",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 72.5,
+      "cost": 20.83,
+      "profit": 51.67
+    },
+    {
+      "id": 75,
+      "date": "2024-06-04",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 68.0,
+      "cost": 16.53,
+      "profit": 51.47
+    },
+    {
+      "id": 76,
+      "date": "2024-06-04",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 68.0,
+      "cost": 16.53,
+      "profit": 51.47
+    },
+    {
+      "id": 77,
+      "date": "2024-06-05",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 68.0,
+      "cost": 16.53,
+      "profit": 51.47
+    },
+    {
+      "id": 78,
+      "date": "2024-06-06",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 68.0,
+      "cost": 16.53,
+      "profit": 51.47
+    },
+    {
+      "id": 79,
+      "date": "2024-06-07",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 68.0,
+      "cost": 16.53,
+      "profit": 51.47
+    },
+    {
+      "id": 80,
+      "date": "2024-06-07",
+      "desc": "Jellycat Peanut Penguin",
+      "revenue": 31.5,
+      "cost": 8.8,
+      "profit": 22.7
+    },
+    {
+      "id": 81,
+      "date": "2024-06-11",
+      "desc": "Glass Containers 1000ml x4",
+      "revenue": 20.0,
+      "cost": 0,
+      "profit": 20.0
+    },
+    {
+      "id": 82,
+      "date": "2024-06-13",
+      "desc": "Playdress Tie Back Dress (Navy)",
+      "revenue": 11.5,
+      "cost": 0.8,
+      "profit": 10.7
+    },
+    {
+      "id": 83,
+      "date": "2024-06-14",
+      "desc": "Konica Palmy Tripod",
+      "revenue": 25.0,
+      "cost": 0,
+      "profit": 25.0
+    },
+    {
+      "id": 84,
+      "date": "2024-06-20",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 69.5,
+      "cost": 17.64,
+      "profit": 51.86
+    },
+    {
+      "id": 85,
+      "date": "2024-06-22",
+      "desc": "Jellycat Peanut Penguin",
+      "revenue": 30.0,
+      "cost": 8.0,
+      "profit": 22.0
+    },
+    {
+      "id": 86,
+      "date": "2024-06-22",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 68.0,
+      "cost": 16.53,
+      "profit": 51.47
+    },
+    {
+      "id": 87,
+      "date": "2024-06-23",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 68.0,
+      "cost": 16.14,
+      "profit": 51.86
+    },
+    {
+      "id": 88,
+      "date": "2024-06-25",
+      "desc": "Jellycat Peanut Penguin",
+      "revenue": 30.0,
+      "cost": 8.0,
+      "profit": 22.0
+    },
+    {
+      "id": 89,
+      "date": "2024-06-25",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 68.0,
+      "cost": 16.14,
+      "profit": 51.86
+    },
+    {
+      "id": 90,
+      "date": "2024-06-27",
+      "desc": "Jellycat Peanut Penguin",
+      "revenue": 30.0,
+      "cost": 8.0,
+      "profit": 22.0
+    },
+    {
+      "id": 91,
+      "date": "2024-06-27",
+      "desc": "Jellycat Peanut Penguin",
+      "revenue": 30.0,
+      "cost": 8.0,
+      "profit": 22.0
+    },
+    {
+      "id": 92,
+      "date": "2024-06-27",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 72.5,
+      "cost": 20.44,
+      "profit": 52.06
+    },
+    {
+      "id": 93,
+      "date": "2024-06-27",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 72.5,
+      "cost": 20.44,
+      "profit": 52.06
+    },
+    {
+      "id": 94,
+      "date": "2024-06-28",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 68.0,
+      "cost": 16.53,
+      "profit": 51.47
+    },
+    {
+      "id": 95,
+      "date": "2024-06-30",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 68.0,
+      "cost": 16.14,
+      "profit": 51.86
+    },
+    {
+      "id": 96,
+      "date": "2024-06-30",
+      "desc": "Jellycat Amusable Daisy",
+      "revenue": 75.0,
+      "cost": 22.24,
+      "profit": 52.76
+    },
+    {
+      "id": 97,
+      "date": "2024-06-30",
+      "desc": "Insurance Claim",
+      "revenue": 400.0,
+      "cost": 0,
+      "profit": 400.0
+    },
+    {
+      "id": 98,
+      "date": "2024-06-30",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 68.0,
+      "cost": 16.53,
+      "profit": 51.47
+    },
+    {
+      "id": 99,
+      "date": "2024-07-01",
+      "desc": "Jellycat Bashful Bunny Cotton Tail",
+      "revenue": 40.0,
+      "cost": 0,
+      "profit": 40.0
+    },
+    {
+      "id": 100,
+      "date": "2024-07-07",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 68.0,
+      "cost": 16.53,
+      "profit": 51.47
+    },
+    {
+      "id": 101,
+      "date": "2024-07-08",
+      "desc": "Uniqlo Baggy Jeans",
+      "revenue": 31.5,
+      "cost": 0.8,
+      "profit": 30.7
+    },
+    {
+      "id": 102,
+      "date": "2024-07-12",
+      "desc": "Lululemon Cinchable Cuff High Rise Jogger",
+      "revenue": 51.5,
+      "cost": 0.8,
+      "profit": 50.7
+    },
+    {
+      "id": 103,
+      "date": "2024-08-05",
+      "desc": "Uniqlo Linen Cotton Shorts",
+      "revenue": 20.0,
+      "cost": 0.8,
+      "profit": 19.2
+    },
+    {
+      "id": 104,
+      "date": "2024-08-14",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 69.5,
+      "cost": 2.66,
+      "profit": 66.84
+    },
+    {
+      "id": 105,
+      "date": "2024-08-24",
+      "desc": "Jellycat Amusable Bouquet",
+      "revenue": 68.0,
+      "cost": 1.85,
+      "profit": 66.14
+    },
+    {
+      "id": 106,
+      "date": "2024-08-16",
+      "desc": "Black Satin Skirt",
+      "revenue": 8.0,
+      "cost": 0,
+      "profit": 8.0
+    },
+    {
+      "id": 107,
+      "date": "2024-09-05",
+      "desc": "Wilson Shift Tennis Racket",
+      "revenue": 260.0,
+      "cost": 0,
+      "profit": 260.0
+    },
+    {
+      "id": 108,
+      "date": "2024-09-10",
+      "desc": "Lululemon Align Nulu Cropped Jacket",
+      "revenue": 170.0,
+      "cost": 0,
+      "profit": 170.0
+    },
+    {
+      "id": 109,
+      "date": "2024-10-03",
+      "desc": "UGG Scarf",
+      "revenue": 40.0,
+      "cost": 0.8,
+      "profit": 39.2
+    },
+    {
+      "id": 110,
+      "date": "2024-10-07",
+      "desc": "JAAN Vouchers x2",
+      "revenue": 10.0,
+      "cost": 0,
+      "profit": 10.0
+    },
+    {
+      "id": 111,
+      "date": "2024-10-11",
+      "desc": "Sale of Socgen Shares",
+      "revenue": 17591.82,
+      "cost": 15700.0,
+      "profit": 1891.82
+    },
+    {
+      "id": 112,
+      "date": "2024-10-29",
+      "desc": "Jellycat Coffee Cup",
+      "revenue": 30.0,
+      "cost": 0,
+      "profit": 30.0
+    },
+    {
+      "id": 113,
+      "date": "2024-11-05",
+      "desc": "Uniqlo Jeans",
+      "revenue": 20.0,
+      "cost": 0,
+      "profit": 20.0
+    },
+    {
+      "id": 114,
+      "date": "2024-11-22",
+      "desc": "Jellycat Pancake",
+      "revenue": 110.0,
+      "cost": 82.28,
+      "profit": 27.72
+    },
+    {
+      "id": 115,
+      "date": "2024-11-22",
+      "desc": "Jellycat Pancake",
+      "revenue": 110.0,
+      "cost": 82.28,
+      "profit": 27.72
+    },
+    {
+      "id": 116,
+      "date": "2024-11-23",
+      "desc": "Capybara",
+      "revenue": 7.0,
+      "cost": 0,
+      "profit": 7.0
+    },
+    {
+      "id": 117,
+      "date": "2024-11-27",
+      "desc": "Jellycat Winter Warmer Otto Sausage Dog",
+      "revenue": 74.5,
+      "cost": 3.5,
+      "profit": 71.0
+    },
+    {
+      "id": 118,
+      "date": "2024-11-27",
+      "desc": "AMI Cardigan",
+      "revenue": 250.0,
+      "cost": 0,
+      "profit": 250.0
+    },
+    {
+      "id": 119,
+      "date": "2024-12-09",
+      "desc": "Jellycat Bartholomew Bear",
+      "revenue": 35.5,
+      "cost": 0.8,
+      "profit": 34.7
+    },
+    {
+      "id": 120,
+      "date": "2024-12-13",
+      "desc": "Revolut",
+      "revenue": 90.0,
+      "cost": 0,
+      "profit": 90.0
+    },
+    {
+      "id": 121,
+      "date": "2024-12-13",
+      "desc": "Found Money On Floor",
+      "revenue": 50.0,
+      "cost": 0,
+      "profit": 50.0
+    },
+    {
+      "id": 122,
+      "date": "2024-12-25",
+      "desc": "Smiski Cheer x3",
+      "revenue": 39.0,
+      "cost": 2.0,
+      "profit": 37.0
+    },
+    {
+      "id": 123,
+      "date": "2024-12-30",
+      "desc": "Jellycat Pancake",
+      "revenue": 110.0,
+      "cost": 0,
+      "profit": 110.0
+    },
+    {
+      "id": 124,
+      "date": "2025-01-19",
+      "desc": "Skechers D'lites Shoe",
+      "revenue": 38.0,
+      "cost": 0,
+      "profit": 38.0
+    },
+    {
+      "id": 125,
+      "date": "2025-01-23",
+      "desc": "Smiski Cheer",
+      "revenue": 10.0,
+      "cost": 0,
+      "profit": 10.0
+    },
+    {
+      "id": 126,
+      "date": "2025-01-22",
+      "desc": "TPB Puffer Shopper",
+      "revenue": 30.0,
+      "cost": 0,
+      "profit": 30.0
+    },
+    {
+      "id": 127,
+      "date": "2025-01-21",
+      "desc": "Uniqlo Smart Tucked Shorts",
+      "revenue": 10.0,
+      "cost": 0.8,
+      "profit": 9.2
+    },
+    {
+      "id": 128,
+      "date": "2025-01-25",
+      "desc": "Sous Vide Machine",
+      "revenue": 60.0,
+      "cost": 0,
+      "profit": 60.0
+    },
+    {
+      "id": 129,
+      "date": "2025-02-13",
+      "desc": "Angbao",
+      "revenue": 182.0,
+      "cost": 0,
+      "profit": 182.0
+    },
+    {
+      "id": 130,
+      "date": "2025-02-21",
+      "desc": "Mini Nespresso Capsule Dispenser",
+      "revenue": 15.0,
+      "cost": 0,
+      "profit": 15.0
+    },
+    {
+      "id": 131,
+      "date": "2025-02-26",
+      "desc": "Nespresso Touch Travel Mug",
+      "revenue": 16.0,
+      "cost": 0,
+      "profit": 16.0
+    },
+    {
+      "id": 132,
+      "date": "2025-03-18",
+      "desc": "and Wander Down Vest",
+      "revenue": 100.0,
+      "cost": 0,
+      "profit": 100.0
+    },
+    {
+      "id": 133,
+      "date": "2025-04-09",
+      "desc": "Top Toy Piano Melody Plush",
+      "revenue": 15.0,
+      "cost": 0,
+      "profit": 15.0
+    },
+    {
+      "id": 134,
+      "date": "2025-04-13",
+      "desc": "TEM Rorie Linen Tiered Dress",
+      "revenue": 30.0,
+      "cost": 0.8,
+      "profit": 29.2
+    },
+    {
+      "id": 135,
+      "date": "2025-04-14",
+      "desc": "Jellycat Sacha Tiger",
+      "revenue": 53.4,
+      "cost": 2.0,
+      "profit": 51.4
+    },
+    {
+      "id": 136,
+      "date": "2025-04-15",
+      "desc": "Kilian GGGB 100ml",
+      "revenue": 300.0,
+      "cost": 0,
+      "profit": 300.0
+    },
+    {
+      "id": 137,
+      "date": "2025-04-21",
+      "desc": "Black Boots (Sis's)",
+      "revenue": 15.0,
+      "cost": 0,
+      "profit": 15.0
+    },
+    {
+      "id": 138,
+      "date": "2025-04-25",
+      "desc": "Moneysmart Webull Sign Up Promo",
+      "revenue": 465.0,
+      "cost": 0,
+      "profit": 465.0
+    },
+    {
+      "id": 139,
+      "date": "2025-04-25",
+      "desc": "Alexa Amazon Echo Dot 3",
+      "revenue": 35.0,
+      "cost": 0,
+      "profit": 35.0
+    },
+    {
+      "id": 140,
+      "date": "2025-04-29",
+      "desc": "Cartier JUC",
+      "revenue": 40.0,
+      "cost": 0,
+      "profit": 40.0
+    },
+    {
+      "id": 141,
+      "date": "2025-05-03",
+      "desc": "Le Labo Diffuser",
+      "revenue": 80.0,
+      "cost": 0,
+      "profit": 80.0
+    },
+    {
+      "id": 142,
+      "date": "2025-05-08",
+      "desc": "Takahi Slow Cooker",
+      "revenue": 60.0,
+      "cost": 0,
+      "profit": 60.0
+    },
+    {
+      "id": 143,
+      "date": "2025-05-08",
+      "desc": "Amazon Echo Show 5",
+      "revenue": 40.0,
+      "cost": 0,
+      "profit": 40.0
+    },
+    {
+      "id": 144,
+      "date": "2025-05-17",
+      "desc": "Le Labo Diffuser",
+      "revenue": 80.0,
+      "cost": 0,
+      "profit": 80.0
+    },
+    {
+      "id": 145,
+      "date": "2025-05-22",
+      "desc": "Chaumet Bracelet (Rose Gold)",
+      "revenue": 40.0,
+      "cost": 0,
+      "profit": 40.0
+    },
+    {
+      "id": 146,
+      "date": "2025-05-23",
+      "desc": "Jellycat Smudge Rabbit",
+      "revenue": 63.5,
+      "cost": 2.0,
+      "profit": 61.5
+    },
+    {
+      "id": 147,
+      "date": "2025-05-30",
+      "desc": "Luminous Belt Strap",
+      "revenue": 11.0,
+      "cost": 0,
+      "profit": 11.0
+    },
+    {
+      "id": 148,
+      "date": "2025-06-01",
+      "desc": "Benefit Hoola Benefit Lite",
+      "revenue": 16.0,
+      "cost": 0,
+      "profit": 16.0
+    },
+    {
+      "id": 149,
+      "date": "2025-06-02",
+      "desc": "Jellycat Smudge Lamb",
+      "revenue": 64.0,
+      "cost": 2.0,
+      "profit": 62.0
+    },
+    {
+      "id": 150,
+      "date": "2025-06-02",
+      "desc": "Jellycat Smudge Bear",
+      "revenue": 65.5,
+      "cost": 2.0,
+      "profit": 63.5
+    },
+    {
+      "id": 151,
+      "date": "2025-06-04",
+      "desc": "GoPro Hero 12 + Accessories",
+      "revenue": 500.0,
+      "cost": 0,
+      "profit": 500.0
+    },
+    {
+      "id": 152,
+      "date": "2025-06-12",
+      "desc": "Smiski Buffski",
+      "revenue": 45.0,
+      "cost": 11.0,
+      "profit": 34.0
+    },
+    {
+      "id": 153,
+      "date": "2025-06-14",
+      "desc": "Sonny Angel Calico",
+      "revenue": 14.0,
+      "cost": 0,
+      "profit": 14.0
+    },
+    {
+      "id": 154,
+      "date": "2025-06-17",
+      "desc": "Jellycat Smudge Fox",
+      "revenue": 62.0,
+      "cost": 0,
+      "profit": 62.0
+    },
+    {
+      "id": 155,
+      "date": "2025-07-15",
+      "desc": "Le Labo Diffuser",
+      "revenue": 80.0,
+      "cost": 0,
+      "profit": 80.0
+    },
+    {
+      "id": 156,
+      "date": "2025-08-04",
+      "desc": "Pure Fitness/Yoga Membership",
+      "revenue": 700.0,
+      "cost": 0,
+      "profit": 700.0
+    },
+    {
+      "id": 157,
+      "date": "2025-08-31",
+      "desc": "MoneySmart SAXO Bonus",
+      "revenue": 350.0,
+      "cost": 0,
+      "profit": 350.0
+    },
+    {
+      "id": 158,
+      "date": "2025-09-10",
+      "desc": "Hourglass Horse Palette",
+      "revenue": 154.5,
+      "cost": 148.62,
+      "profit": 5.88
+    },
+    {
+      "id": 159,
+      "date": "2025-09-10",
+      "desc": "Hourglass Horse Palette",
+      "revenue": 164.5,
+      "cost": 150.38,
+      "profit": 14.12
+    },
+    {
+      "id": 160,
+      "date": "2025-09-19",
+      "desc": "Oral B IO-5 Toothbrush",
+      "revenue": 140.0,
+      "cost": 0,
+      "profit": 140.0
+    },
+    {
+      "id": 161,
+      "date": "2025-09-20",
+      "desc": "Smiski Sunday Series",
+      "revenue": 10.0,
+      "cost": 0,
+      "profit": 10.0
+    },
+    {
+      "id": 162,
+      "date": "2025-09-21",
+      "desc": "Artego Tennis Balls",
+      "revenue": 27.0,
+      "cost": 0,
+      "profit": 27.0
+    },
+    {
+      "id": 163,
+      "date": "2025-09-22",
+      "desc": "Moncler Down Jacket",
+      "revenue": 150.0,
+      "cost": 0,
+      "profit": 150.0
+    },
+    {
+      "id": 164,
+      "date": "2025-10-20",
+      "desc": "Oral B Series 7000",
+      "revenue": 20.0,
+      "cost": 0,
+      "profit": 20.0
+    },
+    {
+      "id": 165,
+      "date": "2025-10-28",
+      "desc": "Le Labo Diffuser",
+      "revenue": 73.6,
+      "cost": 3.49,
+      "profit": 70.11
+    },
+    {
+      "id": 166,
+      "date": "2025-11-03",
+      "desc": "Amazon Echo Dot",
+      "revenue": 32.0,
+      "cost": 0,
+      "profit": 32.0
+    },
+    {
+      "id": 167,
+      "date": "2025-11-14",
+      "desc": "JBL Boombox 2",
+      "revenue": 280.0,
+      "cost": 0,
+      "profit": 280.0
+    },
+    {
+      "id": 168,
+      "date": "2025-11-18",
+      "desc": "Jellycat Large + Small Eggplant",
+      "revenue": 115.0,
+      "cost": 0,
+      "profit": 115.0
+    },
+    {
+      "id": 169,
+      "date": "2025-11-23",
+      "desc": "Sonny Angel Pudding",
+      "revenue": 16.0,
+      "cost": 2.0,
+      "profit": 14.0
+    },
+    {
+      "id": 170,
+      "date": "2025-11-24",
+      "desc": "Guinness Draught NitroSurge",
+      "revenue": 20.0,
+      "cost": 0,
+      "profit": 20.0
+    },
+    {
+      "id": 171,
+      "date": "2025-11-28",
+      "desc": "Le Labo Diffuser",
+      "revenue": 65.0,
+      "cost": 0,
+      "profit": 65.0
+    },
+    {
+      "id": 172,
+      "date": "2025-11-29",
+      "desc": "Jellycat Huge Bashful Bunny (Pink)",
+      "revenue": 90.0,
+      "cost": 0,
+      "profit": 90.0
+    },
+    {
+      "id": 173,
+      "date": "2025-11-30",
+      "desc": "Lv Red Alma BB Vernis Amarante",
+      "revenue": 105.4,
+      "cost": 9.1,
+      "profit": 96.3
+    },
+    {
+      "id": 174,
+      "date": "2025-12-02",
+      "desc": "GST Voucher from GOV",
+      "revenue": 350.0,
+      "cost": 0,
+      "profit": 350.0
+    },
+    {
+      "id": 175,
+      "date": "2025-12-08",
+      "desc": "Dior Book Tote",
+      "revenue": 50.0,
+      "cost": 0,
+      "profit": 50.0
+    },
+    {
+      "id": 176,
+      "date": "2025-12-09",
+      "desc": "Apple Watch Strap",
+      "revenue": 20.0,
+      "cost": 0,
+      "profit": 20.0
+    },
+    {
+      "id": 177,
+      "date": "2025-12-10",
+      "desc": "Logitech G733 Headphones",
+      "revenue": 50.0,
+      "cost": 0,
+      "profit": 50.0
+    },
+    {
+      "id": 178,
+      "date": "2025-12-31",
+      "desc": "Oral B Toothbrush Case",
+      "revenue": 3.0,
+      "cost": 0,
+      "profit": 3.0
+    },
+    {
+      "id": 179,
+      "date": "2026-01-01",
+      "desc": "Chanel Tweed Heels",
+      "revenue": 90.0,
+      "cost": 0,
+      "profit": 90.0
+    },
+    {
+      "id": 180,
+      "date": "2026-01-02",
+      "desc": "V Nason & Co Murano Italy Glass Dolphin (Collect in Apr)",
+      "revenue": 50.0,
+      "cost": 0,
+      "profit": 50.0
+    },
+    {
+      "id": 181,
+      "date": "2026-01-04",
+      "desc": "Miu Miu New Balance Sneakers",
+      "revenue": 184.0,
+      "cost": 3.5,
+      "profit": 180.5
+    },
+    {
+      "id": 182,
+      "date": "2026-01-05",
+      "desc": "Aunty Amanda Bag Sale Commission",
+      "revenue": 80.0,
+      "cost": 0,
+      "profit": 80.0
+    },
+    {
+      "id": 183,
+      "date": "2026-01-12",
+      "desc": "Polene Numero Dix",
+      "revenue": 150.0,
+      "cost": 0,
+      "profit": 150.0
+    },
+    {
+      "id": 184,
+      "date": "2026-01-17",
+      "desc": "Hermes Mini Lindy",
+      "revenue": 60.0,
+      "cost": 0,
+      "profit": 60.0
+    },
+    {
+      "id": 185,
+      "date": "2026-01-18",
+      "desc": "Le Labo Diffuser",
+      "revenue": 60.0,
+      "cost": 36.5,
+      "profit": 23.5
+    },
+    {
+      "id": 186,
+      "date": "2026-02-05",
+      "desc": "Rare Beauty Blush (Hope)",
+      "revenue": 25.0,
+      "cost": 2.5,
+      "profit": 22.5
+    },
+    {
+      "id": 187,
+      "date": "2026-02-09",
+      "desc": "Milo Peng Plushie",
+      "revenue": 5.0,
+      "cost": 0,
+      "profit": 5.0
+    },
+    {
+      "id": 188,
+      "date": "2026-02-12",
+      "desc": "PopMart (Lucky Draw Win)",
+      "revenue": 270.0,
+      "cost": 0,
+      "profit": 270.0
+    },
+    {
+      "id": 189,
+      "date": "2026-02-18",
+      "desc": "Zebra Kitchen Tongs",
+      "revenue": 10.0,
+      "cost": 2.5,
+      "profit": 7.5
+    },
+    {
+      "id": 190,
+      "date": "2026-02-23",
+      "desc": "Milk Makeup Blush Werk",
+      "revenue": 22.5,
+      "cost": 2.5,
+      "profit": 20.0
+    },
+    {
+      "id": 191,
+      "date": "2026-03-09",
+      "desc": "4 Pants (Uniqlo, TEM)",
+      "revenue": 95.0,
+      "cost": 0,
+      "profit": 95.0
+    },
+    {
+      "id": 192,
+      "date": "2026-03-19",
+      "desc": "Roger Vivier Mary Janes",
+      "revenue": 80.0,
+      "cost": 0,
+      "profit": 80.0
+    }
+  ],
+  "recurring": [
+    {
+      "name": "Mom",
+      "amount": 500.0,
+      "category": "Bills"
+    },
+    {
+      "name": "Prudential (Investments)",
+      "amount": 347.94,
+      "category": "Investments"
+    },
+    {
+      "name": "Chubb True Accident Guard",
+      "amount": 40.35,
+      "category": "Bills"
+    }
+  ]
+}
+
+def seed():
+    conn = sqlite3.connect(DB_PATH)
+    print(f"Connected to {DB_PATH}")
+
+    # Create tables if they don't exist
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS transactions (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            date        TEXT NOT NULL,
+            desc        TEXT NOT NULL,
+            category    TEXT NOT NULL,
+            total       REAL NOT NULL,
+            my_amt      REAL NOT NULL,
+            card        TEXT NOT NULL,
+            qualifying  TEXT NOT NULL DEFAULT 'Yes',
+            type        TEXT NOT NULL DEFAULT 'expense',
+            created_at  TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS sales (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            date        TEXT NOT NULL,
+            desc        TEXT NOT NULL,
+            revenue     REAL NOT NULL,
+            cost        REAL NOT NULL DEFAULT 0,
+            profit      REAL NOT NULL DEFAULT 0,
+            created_at  TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS recurring (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            name        TEXT NOT NULL,
+            amount      REAL NOT NULL,
+            category    TEXT NOT NULL,
+            active      INTEGER NOT NULL DEFAULT 1
+        );
+    """)
+
+    # Clear existing historical data and re-insert cleanly
+    conn.execute("DELETE FROM transactions")
+    conn.execute("DELETE FROM sales")
+    conn.execute("DELETE FROM recurring")
+    print("Cleared existing data.")
+
+    now = datetime.now().isoformat()
+
+    # Insert transactions
+    for t in DATA["transactions"]:
+        conn.execute("""
+            INSERT INTO transactions (date, desc, category, total, my_amt, card, qualifying, type, created_at)
+            VALUES (?,?,?,?,?,?,?,?,?)
+        """, (t["date"], t["desc"], t["category"], t["total"], t["my_amt"],
+              t["card"], t["qualifying"], t.get("type","expense"), now))
+    print(f"Inserted {len(DATA['transactions'])} transactions.")
+
+    # Insert sales
+    for s in DATA["sales"]:
+        conn.execute("""
+            INSERT INTO sales (date, desc, revenue, cost, profit, created_at)
+            VALUES (?,?,?,?,?,?)
+        """, (s["date"], s["desc"], s["revenue"], s["cost"], s["profit"], now))
+    print(f"Inserted {len(DATA['sales'])} sales.")
+
+    # Insert recurring items
+    for r in DATA["recurring"]:
+        conn.execute("""
+            INSERT INTO recurring (name, amount, category, active)
+            VALUES (?,?,?,1)
+        """, (r["name"], r["amount"], r["category"]))
+    print(f"Inserted {len(DATA['recurring'])} recurring items.")
+
+    conn.commit()
+    conn.close()
+    print("✅ Seed complete.")
+
+if __name__ == "__main__":
+    seed()
