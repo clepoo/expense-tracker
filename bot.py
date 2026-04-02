@@ -72,14 +72,23 @@ CARD_CAPS = {
 EDITABLE_FIELDS = {"amount","desc","category","card","date","qualifying","my_amt"}
 
 # ── DATABASE ──────────────────────────────────────────────────────
-def db_commit(conn):
-    """Commit for SQLite, sync for Turso."""
-    if USE_TURSO:
-        conn.commit()
-        try: conn.sync()
-        except Exception: pass
-    else:
-        conn.commit()
+# libsql_experimental (Turso) quirks vs sqlite3:
+#   - row_factory not supported → use cursor.description to build dicts
+#   - executescript not supported → use individual execute statements
+#   - no sync() needed for remote-only connections
+
+def _rows_to_dicts(cursor, rows):
+    """Convert rows to dicts using cursor.description column names."""
+    if not rows:
+        return []
+    cols = [d[0] for d in cursor.description]
+    return [dict(zip(cols, row)) for row in rows]
+
+def _row_to_dict(cursor, row):
+    if row is None:
+        return None
+    cols = [d[0] for d in cursor.description]
+    return dict(zip(cols, row))
 
 def get_conn():
     if USE_TURSO:
@@ -87,74 +96,58 @@ def get_conn():
             database=os.environ["TURSO_URL"],
             auth_token=os.environ["TURSO_TOKEN"],
         )
-        conn.row_factory = sqlite3.Row
     else:
         conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
     return conn
+
+def db_commit(conn):
+    conn.commit()
 
 def init_db():
     conn = get_conn()
-    conn.executescript("""
-        CREATE TABLE IF NOT EXISTS transactions (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            date        TEXT NOT NULL,
-            desc        TEXT NOT NULL,
-            category    TEXT NOT NULL,
-            total       REAL NOT NULL,
-            my_amt      REAL NOT NULL,
-            card        TEXT NOT NULL,
-            qualifying  TEXT NOT NULL DEFAULT 'Yes',
-            type        TEXT NOT NULL DEFAULT 'expense',
-            created_at  TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS sales (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            date        TEXT NOT NULL,
-            desc        TEXT NOT NULL,
-            revenue     REAL NOT NULL,
-            cost        REAL NOT NULL DEFAULT 0,
-            profit      REAL NOT NULL DEFAULT 0,
-            created_at  TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS recurring (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            name        TEXT NOT NULL,
-            amount      REAL NOT NULL,
-            category    TEXT NOT NULL,
-            active      INTEGER NOT NULL DEFAULT 1
-        );
-    """)
+    for stmt in [
+        """CREATE TABLE IF NOT EXISTS transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT NOT NULL,
+            desc TEXT NOT NULL, category TEXT NOT NULL, total REAL NOT NULL,
+            my_amt REAL NOT NULL, card TEXT NOT NULL,
+            qualifying TEXT NOT NULL DEFAULT 'Yes',
+            type TEXT NOT NULL DEFAULT 'expense', created_at TEXT NOT NULL)""",
+        """CREATE TABLE IF NOT EXISTS sales (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT NOT NULL,
+            desc TEXT NOT NULL, revenue REAL NOT NULL, cost REAL NOT NULL DEFAULT 0,
+            profit REAL NOT NULL DEFAULT 0, created_at TEXT NOT NULL)""",
+        """CREATE TABLE IF NOT EXISTS recurring (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
+            amount REAL NOT NULL, category TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1)""",
+    ]:
+        conn.execute(stmt)
     db_commit(conn)
     conn.close()
 
 def insert_transaction(date_, desc, category, total, my_amt, card, qualifying="Yes", typ="expense"):
     conn = get_conn()
-    cur = conn.execute("""
-        INSERT INTO transactions (date,desc,category,total,my_amt,card,qualifying,type,created_at)
-        VALUES (?,?,?,?,?,?,?,?,?)
-    """, (date_, desc, category, round(total,2), round(my_amt,2), card, qualifying, typ, datetime.now().isoformat()))
+    cur = conn.execute(
+        "INSERT INTO transactions (date,desc,category,total,my_amt,card,qualifying,type,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+        (date_, desc, category, round(total,2), round(my_amt,2), card, qualifying, typ, datetime.now().isoformat())
+    )
     tid = cur.lastrowid
-    conn.commit(); conn.close()
+    db_commit(conn); conn.close()
     return tid
 
 def update_transaction(tid, field, value):
     allowed = {"date","desc","category","total","my_amt","card","qualifying"}
     if field not in allowed:
         return False, f"Cannot edit field '{field}'"
-    conn = get_conn()
-    # Validate card / category
     if field == "card" and value not in CARDS:
-        conn.close()
         return False, f"Unknown card. Options: {', '.join(CARDS)}"
     if field == "category" and value not in CATEGORIES:
-        conn.close()
         return False, f"Unknown category. Options: {', '.join(CATEGORIES)}"
     if field in ("total","my_amt"):
         try: value = round(float(value),2)
-        except: conn.close(); return False, "Amount must be a number"
+        except: return False, "Amount must be a number"
+    conn = get_conn()
     conn.execute(f"UPDATE transactions SET {field}=? WHERE id=?", (value, tid))
-    conn.commit(); conn.close()
+    db_commit(conn); conn.close()
     return True, "Updated"
 
 def fetch_transactions(year=None, month=None, limit=None, typ=None):
@@ -167,52 +160,60 @@ def fetch_transactions(year=None, month=None, limit=None, typ=None):
         where.append("type = ?"); params.append(typ)
     ws = ("WHERE " + " AND ".join(where)) if where else ""
     lim = f"LIMIT {limit}" if limit else ""
-    rows = conn.execute(f"SELECT * FROM transactions {ws} ORDER BY date DESC, id DESC {lim}", params).fetchall()
+    cur = conn.execute(f"SELECT * FROM transactions {ws} ORDER BY date DESC, id DESC {lim}", params)
+    rows = _rows_to_dicts(cur, cur.fetchall())
     conn.close()
-    return [dict(r) for r in rows]
+    return rows
 
 def get_transaction(tid):
     conn = get_conn()
-    row = conn.execute("SELECT * FROM transactions WHERE id=?", (tid,)).fetchone()
+    cur = conn.execute("SELECT * FROM transactions WHERE id=?", (tid,))
+    row = _row_to_dict(cur, cur.fetchone())
     conn.close()
-    return dict(row) if row else None
+    return row
 
 def delete_transaction(tid):
     conn = get_conn()
-    affected = conn.execute("DELETE FROM transactions WHERE id=?", (tid,)).rowcount
-    conn.commit(); conn.close()
-    return affected > 0
+    conn.execute("DELETE FROM transactions WHERE id=?", (tid,))
+    db_commit(conn); conn.close()
+    return True
 
 def get_monthly_summary(year, month):
     conn = get_conn()
     ym = f"{year:04d}-{month:02d}"
-    cats = conn.execute("""
+    cur = conn.execute("""
         SELECT category, SUM(my_amt) as total FROM transactions
         WHERE strftime('%Y-%m',date)=? AND type='expense'
         GROUP BY category ORDER BY total DESC
-    """, (ym,)).fetchall()
-    total_row  = conn.execute("SELECT SUM(my_amt) FROM transactions WHERE strftime('%Y-%m',date)=? AND type='expense'", (ym,)).fetchone()
-    count_row  = conn.execute("SELECT COUNT(*) FROM transactions WHERE strftime('%Y-%m',date)=? AND type='expense'", (ym,)).fetchone()
-    card_spend = conn.execute("""
+    """, (ym,))
+    cats = _rows_to_dicts(cur, cur.fetchall())
+    cur2 = conn.execute("SELECT SUM(my_amt) FROM transactions WHERE strftime('%Y-%m',date)=? AND type='expense'", (ym,))
+    total_exp = (cur2.fetchone()[0] or 0)
+    cur3 = conn.execute("SELECT COUNT(*) FROM transactions WHERE strftime('%Y-%m',date)=? AND type='expense'", (ym,))
+    count = (cur3.fetchone()[0] or 0)
+    cur4 = conn.execute("""
         SELECT card, SUM(total) as total FROM transactions
         WHERE strftime('%Y-%m',date)=? AND type='expense' AND qualifying='Yes'
         GROUP BY card ORDER BY total DESC
-    """, (ym,)).fetchall()
+    """, (ym,))
+    card_spend = _rows_to_dicts(cur4, cur4.fetchall())
     conn.close()
-    return [dict(r) for r in cats], (total_row[0] or 0), (count_row[0] or 0), [dict(r) for r in card_spend]
+    return cats, total_exp, count, card_spend
 
 def get_available_months():
     conn = get_conn()
-    rows = conn.execute("SELECT DISTINCT strftime('%Y-%m',date) as ym FROM transactions ORDER BY ym DESC LIMIT 24").fetchall()
+    cur = conn.execute("SELECT DISTINCT strftime('%Y-%m',date) as ym FROM transactions ORDER BY ym DESC LIMIT 24")
+    rows = cur.fetchall()
     conn.close()
     return [r[0] for r in rows]
 
 # ── RECURRING DB ──────────────────────────────────────────────────
 def get_recurring():
     conn = get_conn()
-    rows = conn.execute("SELECT * FROM recurring WHERE active=1 ORDER BY amount DESC").fetchall()
+    cur = conn.execute("SELECT * FROM recurring WHERE active=1 ORDER BY amount DESC")
+    rows = _rows_to_dicts(cur, cur.fetchall())
     conn.close()
-    return [dict(r) for r in rows]
+    return rows
 
 def update_recurring(rid, amount):
     conn = get_conn()
@@ -242,9 +243,10 @@ def get_sales(year=None, month=None):
         where.append("strftime('%Y-%m',date)=?")
         params.append(f"{year:04d}-{month:02d}")
     ws = ("WHERE " + " AND ".join(where)) if where else ""
-    rows = conn.execute(f"SELECT * FROM sales {ws} ORDER BY date DESC, id DESC", params).fetchall()
+    cur = conn.execute(f"SELECT * FROM sales {ws} ORDER BY date DESC, id DESC", params)
+    rows = _rows_to_dicts(cur, cur.fetchall())
     conn.close()
-    return [dict(r) for r in rows]
+    return rows
 
 def insert_sale(date_, desc, revenue, cost):
     conn = get_conn()
