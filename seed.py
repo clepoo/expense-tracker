@@ -3615,11 +3615,9 @@ def seed():
     if USE_TURSO:
         import libsql_experimental as libsql
         conn = libsql.connect(database=TURSO_URL, auth_token=TURSO_TOKEN)
-        conn.row_factory = sqlite3.Row
         print(f"Connected to Turso: {TURSO_URL}")
     else:
         conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
         print(f"Connected to SQLite: {DB_PATH}")
 
     for stmt in [
