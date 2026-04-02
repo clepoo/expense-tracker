@@ -7,6 +7,15 @@ import sqlite3, os
 from datetime import datetime
 
 DB_PATH = os.environ.get("DB_PATH", "finbot.db")
+TURSO_URL = os.environ.get("TURSO_URL")
+TURSO_TOKEN = os.environ.get("TURSO_TOKEN")
+
+try:
+    import libsql_experimental as libsql
+    USE_TURSO = bool(TURSO_URL)
+except ImportError:
+    USE_TURSO = False
+
 DATA = {
   "transactions": [
     {
@@ -1464,94 +1473,6 @@ DATA = {
     {
       "id": 133,
       "type": "expense",
-      "date": "2026-04-02",
-      "desc": "Become Aesthetics - 5X HIFU, 3X Sylfirm X",
-      "category": "Health, Beauty & Wellness",
-      "total": 496.66,
-      "my_amt": 496.66,
-      "card": "HSBC REVO",
-      "qualifying": "Yes"
-    },
-    {
-      "id": 134,
-      "type": "expense",
-      "date": "2026-04-10",
-      "desc": "Become Aesthetics",
-      "category": "Health, Beauty & Wellness",
-      "total": 495.83,
-      "my_amt": 495.83,
-      "card": "HSBC REVO",
-      "qualifying": "Yes"
-    },
-    {
-      "id": 135,
-      "type": "expense",
-      "date": "2026-05-02",
-      "desc": "Become Aesthetics - 5X HIFU, 3X Sylfirm X",
-      "category": "Health, Beauty & Wellness",
-      "total": 496.66,
-      "my_amt": 496.66,
-      "card": "HSBC REVO",
-      "qualifying": "Yes"
-    },
-    {
-      "id": 136,
-      "type": "expense",
-      "date": "2026-05-10",
-      "desc": "Become Aesthetics",
-      "category": "Health, Beauty & Wellness",
-      "total": 495.83,
-      "my_amt": 495.83,
-      "card": "HSBC REVO",
-      "qualifying": "Yes"
-    },
-    {
-      "id": 137,
-      "type": "expense",
-      "date": "2026-06-01",
-      "desc": "Become Aesthetics - 5X HIFU, 3X Sylfirm X",
-      "category": "Health, Beauty & Wellness",
-      "total": 496.66,
-      "my_amt": 496.66,
-      "card": "HSBC REVO",
-      "qualifying": "Yes"
-    },
-    {
-      "id": 138,
-      "type": "expense",
-      "date": "2026-06-09",
-      "desc": "Become Aesthetics",
-      "category": "Health, Beauty & Wellness",
-      "total": 495.83,
-      "my_amt": 495.83,
-      "card": "HSBC REVO",
-      "qualifying": "Yes"
-    },
-    {
-      "id": 139,
-      "type": "expense",
-      "date": "2026-07-01",
-      "desc": "Become Aesthetics - 5X HIFU, 3X Sylfirm X",
-      "category": "Health, Beauty & Wellness",
-      "total": 496.66,
-      "my_amt": 496.66,
-      "card": "HSBC REVO",
-      "qualifying": "Yes"
-    },
-    {
-      "id": 140,
-      "type": "expense",
-      "date": "2026-08-01",
-      "desc": "Become Aesthetics - 5X HIFU, 3X Sylfirm X",
-      "category": "Health, Beauty & Wellness",
-      "total": 496.66,
-      "my_amt": 496.66,
-      "card": "HSBC REVO",
-      "qualifying": "Yes"
-    },
-    {
-      "id": 141,
-      "type": "expense",
       "date": "2026-03-15",
       "desc": "Taobao - Work Pants, Top, Toothbrush, Bottle Cleaner, Luggage Tag, Misc",
       "category": "Shopping",
@@ -1561,7 +1482,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 142,
+      "id": 134,
       "type": "expense",
       "date": "2026-03-15",
       "desc": "Taobao - Hermes Belt",
@@ -1572,7 +1493,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 143,
+      "id": 135,
       "type": "expense",
       "date": "2026-03-16",
       "desc": "Compose Coffee",
@@ -1583,7 +1504,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 144,
+      "id": 136,
       "type": "expense",
       "date": "2026-03-16",
       "desc": "Grab Home from Office",
@@ -1594,7 +1515,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 145,
+      "id": 137,
       "type": "expense",
       "date": "2026-03-17",
       "desc": "Compose Coffee",
@@ -1605,7 +1526,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 146,
+      "id": 138,
       "type": "expense",
       "date": "2026-03-18",
       "desc": "Compose Coffee",
@@ -1616,29 +1537,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 147,
-      "type": "expense",
-      "date": "2026-03-19",
-      "desc": "Compose Coffee",
-      "category": "Food",
-      "total": 6.6,
-      "my_amt": 3.3,
-      "card": "DBS WWMC",
-      "qualifying": "Yes"
-    },
-    {
-      "id": 148,
-      "type": "expense",
-      "date": "2026-03-19",
-      "desc": "Grab Home from Office",
-      "category": "Transport",
-      "total": 11.9,
-      "my_amt": 11.9,
-      "card": "DBS WWMC",
-      "qualifying": "Yes"
-    },
-    {
-      "id": 149,
+      "id": 139,
       "type": "expense",
       "date": "2026-03-18",
       "desc": "Onggii Korean Food",
@@ -1649,7 +1548,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 150,
+      "id": 140,
       "type": "expense",
       "date": "2026-03-18",
       "desc": "Have Fun KTV",
@@ -1660,7 +1559,29 @@ DATA = {
       "qualifying": "No"
     },
     {
-      "id": 151,
+      "id": 141,
+      "type": "expense",
+      "date": "2026-03-19",
+      "desc": "Compose Coffee",
+      "category": "Food",
+      "total": 6.6,
+      "my_amt": 3.3,
+      "card": "DBS WWMC",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 142,
+      "type": "expense",
+      "date": "2026-03-19",
+      "desc": "Grab Home from Office",
+      "category": "Transport",
+      "total": 11.9,
+      "my_amt": 11.9,
+      "card": "DBS WWMC",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 143,
       "type": "expense",
       "date": "2026-03-20",
       "desc": "Loreal Friend's and Family",
@@ -1671,7 +1592,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 152,
+      "id": 144,
       "type": "expense",
       "date": "2026-03-20",
       "desc": "Loreal Friend's and Family",
@@ -1682,7 +1603,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 153,
+      "id": 145,
       "type": "expense",
       "date": "2026-03-20",
       "desc": "Compose Coffee",
@@ -1693,7 +1614,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 154,
+      "id": 146,
       "type": "expense",
       "date": "2026-03-20",
       "desc": "Panda Chan Snack",
@@ -1704,7 +1625,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 155,
+      "id": 147,
       "type": "expense",
       "date": "2026-03-20",
       "desc": "Ramen",
@@ -1715,7 +1636,7 @@ DATA = {
       "qualifying": "No"
     },
     {
-      "id": 156,
+      "id": 148,
       "type": "expense",
       "date": "2026-03-22",
       "desc": "McDonald's",
@@ -1726,7 +1647,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 157,
+      "id": 149,
       "type": "expense",
       "date": "2026-03-24",
       "desc": "Compose Coffee",
@@ -1737,7 +1658,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 158,
+      "id": 150,
       "type": "expense",
       "date": "2026-03-24",
       "desc": "Shopee - Lutein",
@@ -1748,7 +1669,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 159,
+      "id": 151,
       "type": "expense",
       "date": "2026-03-24",
       "desc": "Grab Home from Office",
@@ -1759,7 +1680,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 160,
+      "id": 152,
       "type": "expense",
       "date": "2026-03-25",
       "desc": "Compose Coffee",
@@ -1770,7 +1691,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 161,
+      "id": 153,
       "type": "expense",
       "date": "2026-03-25",
       "desc": "Claude AI",
@@ -1781,7 +1702,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 162,
+      "id": 154,
       "type": "expense",
       "date": "2026-03-25",
       "desc": "Shopee - Konjac Jelly",
@@ -1792,7 +1713,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 163,
+      "id": 155,
       "type": "expense",
       "date": "2026-03-25",
       "desc": "Fat Freeze",
@@ -1803,7 +1724,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 164,
+      "id": 156,
       "type": "expense",
       "date": "2026-03-26",
       "desc": "Shopee - Mints, Lashes",
@@ -1814,7 +1735,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 165,
+      "id": 157,
       "type": "expense",
       "date": "2026-03-26",
       "desc": "Compose Coffee",
@@ -1825,7 +1746,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 166,
+      "id": 158,
       "type": "expense",
       "date": "2026-03-26",
       "desc": "Claude AI",
@@ -1836,7 +1757,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 167,
+      "id": 159,
       "type": "expense",
       "date": "2026-03-27",
       "desc": "Starbucks",
@@ -1847,7 +1768,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 168,
+      "id": 160,
       "type": "expense",
       "date": "2026-03-28",
       "desc": "100 Plus Zero",
@@ -1858,7 +1779,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 169,
+      "id": 161,
       "type": "expense",
       "date": "2026-03-28",
       "desc": "Mr Bean Pistachio Pancake",
@@ -1869,7 +1790,7 @@ DATA = {
       "qualifying": "No"
     },
     {
-      "id": 170,
+      "id": 162,
       "type": "expense",
       "date": "2026-03-29",
       "desc": "Illumia Face - Kyung Rak Facial",
@@ -1880,7 +1801,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 171,
+      "id": 163,
       "type": "expense",
       "date": "2026-03-29",
       "desc": "Johan Bakery",
@@ -1891,7 +1812,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 172,
+      "id": 164,
       "type": "expense",
       "date": "2026-03-29",
       "desc": "Isetan",
@@ -1902,7 +1823,7 @@ DATA = {
       "qualifying": "Yes"
     },
     {
-      "id": 173,
+      "id": 165,
       "type": "expense",
       "date": "2026-03-29",
       "desc": "Isetan - Mom",
@@ -1910,6 +1831,226 @@ DATA = {
       "total": 10.8,
       "my_amt": 10.8,
       "card": "UOB PRIVI",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 166,
+      "type": "expense",
+      "date": "2026-03-30",
+      "desc": "TCM",
+      "category": "Health, Beauty & Wellness",
+      "total": 68.23,
+      "my_amt": 68.23,
+      "card": "UOB PRIVI",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 167,
+      "type": "expense",
+      "date": "2026-03-30",
+      "desc": "Compose Coffee",
+      "category": "Food",
+      "total": 6.6,
+      "my_amt": 3.3,
+      "card": "UOB PRIVI",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 168,
+      "type": "expense",
+      "date": "2026-03-31",
+      "desc": "Chagee",
+      "category": "Food",
+      "total": 15.3,
+      "my_amt": 5.2,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 169,
+      "type": "expense",
+      "date": "2026-04-01",
+      "desc": "Compose Coffee",
+      "category": "Food",
+      "total": 3.3,
+      "my_amt": 3.3,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 170,
+      "type": "expense",
+      "date": "2026-04-01",
+      "desc": "Compose Coffee",
+      "category": "Food",
+      "total": 6.6,
+      "my_amt": 3.3,
+      "card": "DBS WWMC",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 171,
+      "type": "expense",
+      "date": "2026-04-01",
+      "desc": "Mono Studio - Lash Lift Deposit",
+      "category": "Health, Beauty & Wellness",
+      "total": 20.0,
+      "my_amt": 20.0,
+      "card": "Cash",
+      "qualifying": "No"
+    },
+    {
+      "id": 172,
+      "type": "expense",
+      "date": "2026-04-01",
+      "desc": "Next Studio - Hairline Microblade Deposit",
+      "category": "Health, Beauty & Wellness",
+      "total": 100.0,
+      "my_amt": 100.0,
+      "card": "Cash",
+      "qualifying": "No"
+    },
+    {
+      "id": 173,
+      "type": "expense",
+      "date": "2026-04-02",
+      "desc": "Become Aesthetics - 5X HIFU, 3X Sylfirm X",
+      "category": "Health, Beauty & Wellness",
+      "total": 496.66,
+      "my_amt": 496.66,
+      "card": "CITI REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 174,
+      "type": "expense",
+      "date": "2026-04-02",
+      "desc": "Compose Coffee",
+      "category": "Food",
+      "total": 13.9,
+      "my_amt": 5.3,
+      "card": "DBS WWMC",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 175,
+      "type": "expense",
+      "date": "2026-04-04",
+      "desc": "Mono Studio - Lash Lift",
+      "category": "Health, Beauty & Wellness",
+      "total": 60.0,
+      "my_amt": 60.0,
+      "card": "UOB VS SGD",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 176,
+      "type": "expense",
+      "date": "2026-04-04",
+      "desc": "TCM Package",
+      "category": "Health, Beauty & Wellness",
+      "total": 500.0,
+      "my_amt": 500.0,
+      "card": "UOB PPV Contactless",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 177,
+      "type": "expense",
+      "date": "2026-04-04",
+      "desc": "Yakson Beauty Golki Facial",
+      "category": "Health, Beauty & Wellness",
+      "total": 388.0,
+      "my_amt": 388.0,
+      "card": "CITI REWARDS",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 178,
+      "type": "expense",
+      "date": "2026-04-05",
+      "desc": "Next Studio - Hairline Microblade",
+      "category": "Health, Beauty & Wellness",
+      "total": 1030.0,
+      "my_amt": 1030.0,
+      "card": "UOB VS SGD",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 179,
+      "type": "expense",
+      "date": "2026-04-10",
+      "desc": "Become Aesthetics",
+      "category": "Health, Beauty & Wellness",
+      "total": 495.83,
+      "my_amt": 495.83,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 180,
+      "type": "expense",
+      "date": "2026-05-02",
+      "desc": "Become Aesthetics - 5X HIFU, 3X Sylfirm X",
+      "category": "Health, Beauty & Wellness",
+      "total": 496.66,
+      "my_amt": 496.66,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 181,
+      "type": "expense",
+      "date": "2026-05-10",
+      "desc": "Become Aesthetics",
+      "category": "Health, Beauty & Wellness",
+      "total": 495.83,
+      "my_amt": 495.83,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 182,
+      "type": "expense",
+      "date": "2026-06-01",
+      "desc": "Become Aesthetics - 5X HIFU, 3X Sylfirm X",
+      "category": "Health, Beauty & Wellness",
+      "total": 496.66,
+      "my_amt": 496.66,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 183,
+      "type": "expense",
+      "date": "2026-06-09",
+      "desc": "Become Aesthetics",
+      "category": "Health, Beauty & Wellness",
+      "total": 495.83,
+      "my_amt": 495.83,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 184,
+      "type": "expense",
+      "date": "2026-07-01",
+      "desc": "Become Aesthetics - 5X HIFU, 3X Sylfirm X",
+      "category": "Health, Beauty & Wellness",
+      "total": 496.66,
+      "my_amt": 496.66,
+      "card": "HSBC REVO",
+      "qualifying": "Yes"
+    },
+    {
+      "id": 185,
+      "type": "expense",
+      "date": "2026-08-01",
+      "desc": "Become Aesthetics - 5X HIFU, 3X Sylfirm X",
+      "category": "Health, Beauty & Wellness",
+      "total": 496.66,
+      "my_amt": 496.66,
+      "card": "HSBC REVO",
       "qualifying": "Yes"
     }
   ],
@@ -3471,8 +3612,16 @@ DATA = {
 }
 
 def seed():
-    conn = sqlite3.connect(DB_PATH)
-    print(f"Connected to {DB_PATH}")
+    if USE_TURSO:
+        import libsql_experimental as libsql
+        conn = libsql.connect(database=TURSO_URL, auth_token=TURSO_TOKEN)
+        conn.row_factory = sqlite3.Row
+        print(f"Connected to Turso: {TURSO_URL}")
+    else:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        print(f"Connected to SQLite: {DB_PATH}")
+
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS transactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT NOT NULL,
@@ -3512,7 +3661,11 @@ def seed():
         conn.execute("INSERT INTO recurring (name,amount,category,active) VALUES (?,?,?,1)",
                      (r["name"],r["amount"],r["category"]))
     print(f"Inserted {len(DATA['recurring'])} recurring items.")
-    conn.commit(); conn.close()
+    conn.commit()
+    if USE_TURSO:
+        try: conn.sync()
+        except Exception: pass
+    conn.close()
     print("\n✅ Seed complete.")
 
 if __name__ == "__main__":
