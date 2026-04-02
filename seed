@@ -3622,24 +3622,22 @@ def seed():
         conn.row_factory = sqlite3.Row
         print(f"Connected to SQLite: {DB_PATH}")
 
-    conn.executescript("""
-        CREATE TABLE IF NOT EXISTS transactions (
+    for stmt in [
+        """CREATE TABLE IF NOT EXISTS transactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT NOT NULL,
             desc TEXT NOT NULL, category TEXT NOT NULL, total REAL NOT NULL,
             my_amt REAL NOT NULL, card TEXT NOT NULL,
             qualifying TEXT NOT NULL DEFAULT 'Yes',
-            type TEXT NOT NULL DEFAULT 'expense', created_at TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS sales (
+            type TEXT NOT NULL DEFAULT 'expense', created_at TEXT NOT NULL)""",
+        """CREATE TABLE IF NOT EXISTS sales (
             id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT NOT NULL,
             desc TEXT NOT NULL, revenue REAL NOT NULL, cost REAL NOT NULL DEFAULT 0,
-            profit REAL NOT NULL DEFAULT 0, created_at TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS recurring (
+            profit REAL NOT NULL DEFAULT 0, created_at TEXT NOT NULL)""",
+        """CREATE TABLE IF NOT EXISTS recurring (
             id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
-            amount REAL NOT NULL, category TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1
-        );
-    """)
+            amount REAL NOT NULL, category TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1)""",
+    ]:
+        conn.execute(stmt)
     conn.execute("DELETE FROM transactions")
     conn.execute("DELETE FROM sales")
     conn.execute("DELETE FROM recurring")
