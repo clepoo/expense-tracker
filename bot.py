@@ -4,6 +4,11 @@ Features: expense logging, edit, recurring management, miles tracker, web dashbo
 """
 
 import os, json, sqlite3, logging, threading
+try:
+    import libsql_experimental as libsql
+    USE_TURSO = bool(os.environ.get("TURSO_URL"))
+except ImportError:
+    USE_TURSO = False
 from datetime import datetime, date
 from anthropic import Anthropic
 from flask import Flask, request, session, redirect, jsonify
@@ -67,9 +72,25 @@ CARD_CAPS = {
 EDITABLE_FIELDS = {"amount","desc","category","card","date","qualifying","my_amt"}
 
 # ── DATABASE ──────────────────────────────────────────────────────
+def db_commit(conn):
+    """Commit for SQLite, sync for Turso."""
+    if USE_TURSO:
+        conn.commit()
+        try: conn.sync()
+        except Exception: pass
+    else:
+        conn.commit()
+
 def get_conn():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    if USE_TURSO:
+        conn = libsql.connect(
+            database=os.environ["TURSO_URL"],
+            auth_token=os.environ["TURSO_TOKEN"],
+        )
+        conn.row_factory = sqlite3.Row
+    else:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
@@ -104,7 +125,7 @@ def init_db():
             active      INTEGER NOT NULL DEFAULT 1
         );
     """)
-    conn.commit()
+    db_commit(conn)
     conn.close()
 
 def insert_transaction(date_, desc, category, total, my_amt, card, qualifying="Yes", typ="expense"):
