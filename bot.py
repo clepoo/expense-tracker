@@ -160,7 +160,7 @@ def fetch_transactions(year=None, month=None, limit=None, typ=None):
         where.append("type = ?"); params.append(typ)
     ws = ("WHERE " + " AND ".join(where)) if where else ""
     lim = f"LIMIT {limit}" if limit else ""
-    cur = conn.execute(f"SELECT * FROM transactions {ws} ORDER BY date DESC, id DESC {lim}", params)
+    cur = conn.execute(f"SELECT * FROM transactions {ws} ORDER BY date DESC, id DESC {lim}", tuple(params))
     rows = _rows_to_dicts(cur, cur.fetchall())
     conn.close()
     return rows
@@ -218,22 +218,22 @@ def get_recurring():
 def update_recurring(rid, amount):
     conn = get_conn()
     conn.execute("UPDATE recurring SET amount=? WHERE id=?", (round(float(amount),2), rid))
-    conn.commit(); conn.close()
+    db_commit(conn); conn.close()
 
 def toggle_recurring(rid, active):
     conn = get_conn()
     conn.execute("UPDATE recurring SET active=? WHERE id=?", (1 if active else 0, rid))
-    conn.commit(); conn.close()
+    db_commit(conn); conn.close()
 
 def add_recurring(name, amount, category):
     conn = get_conn()
     conn.execute("INSERT INTO recurring (name,amount,category,active) VALUES (?,?,?,1)", (name, round(float(amount),2), category))
-    conn.commit(); conn.close()
+    db_commit(conn); conn.close()
 
 def delete_recurring(rid):
     conn = get_conn()
     conn.execute("DELETE FROM recurring WHERE id=?", (rid,))
-    conn.commit(); conn.close()
+    db_commit(conn); conn.close()
 
 # ── SALES DB ──────────────────────────────────────────────────────
 def get_sales(year=None, month=None):
@@ -243,7 +243,7 @@ def get_sales(year=None, month=None):
         where.append("strftime('%Y-%m',date)=?")
         params.append(f"{year:04d}-{month:02d}")
     ws = ("WHERE " + " AND ".join(where)) if where else ""
-    cur = conn.execute(f"SELECT * FROM sales {ws} ORDER BY date DESC, id DESC", params)
+    cur = conn.execute(f"SELECT * FROM sales {ws} ORDER BY date DESC, id DESC", tuple(params))
     rows = _rows_to_dicts(cur, cur.fetchall())
     conn.close()
     return rows
@@ -253,13 +253,13 @@ def insert_sale(date_, desc, revenue, cost):
     profit = round(revenue-cost,2)
     conn.execute("INSERT INTO sales (date,desc,revenue,cost,profit,created_at) VALUES (?,?,?,?,?,?)",
                  (date_, desc, round(revenue,2), round(cost,2), profit, datetime.now().isoformat()))
-    conn.commit(); conn.close()
+    db_commit(conn); conn.close()
 
 def delete_sale(sid):
     conn = get_conn()
-    affected = conn.execute("DELETE FROM sales WHERE id=?", (sid,)).rowcount
-    conn.commit(); conn.close()
-    return affected > 0
+    conn.execute("DELETE FROM sales WHERE id=?", (sid,))
+    db_commit(conn); conn.close()
+    return True
 
 # ── CLAUDE PARSER ─────────────────────────────────────────────────
 PARSE_SYSTEM = f"""You are a finance expense parser for a Singapore user.
@@ -574,7 +574,7 @@ def edit_entry(tid):
                 if field in ("total","my_amt"): val=round(float(val),2)
                 conn=get_conn()
                 conn.execute(f"UPDATE transactions SET {field}=? WHERE id=?", (val,tid))
-                conn.commit(); conn.close()
+                db_commit(conn); conn.close()
     except Exception as e:
         log.error(f"Edit error: {e}")
     return redirect(request.form.get("back","/"))
@@ -799,7 +799,15 @@ async def cmd_recent(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         lines.append(f"`#{t['id']}` {CAT_EMOJI.get(t['category'],'📌')} *{esc(t['desc'])}*\n"
                      f"   ${t['total']:.2f}{sp} · {esc(t['card'])} · {t['date']}\n"
                      f"   _{esc(t['category'])}_")
-    await update.message.reply_text("\n\n".join(lines), parse_mode="MarkdownV2")
+    try:
+        await update.message.reply_text("\n\n".join(lines), parse_mode="MarkdownV2")
+    except Exception:
+        # Fall back to plain text if MarkdownV2 fails due to special chars
+        plain = []
+        for t in rows:
+            sp = f" (you: ${t['my_amt']:.2f})" if abs(t["my_amt"]-t["total"])>0.01 else ""
+            plain.append(f"#{t['id']} {t['desc']}\n  ${t['total']:.2f}{sp} · {t['card']} · {t['date']}\n  {t['category']}")
+        await update.message.reply_text("Recent transactions:\n\n" + "\n\n".join(plain))
 
 async def cmd_summary(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update): return await reject(update)
