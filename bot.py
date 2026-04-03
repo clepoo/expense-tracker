@@ -265,39 +265,50 @@ def delete_sale(sid):
 PARSE_SYSTEM = f"""You are a finance expense parser for a Singapore user.
 Parse the user's message into a JSON expense entry.
 
-Available cards: {", ".join(CARDS)}
+Available cards (match case-insensitively): {", ".join(CARDS)}
 Available categories: {", ".join(CATEGORIES)}
 
-Card notes:
-- UOB PRIVI: 1.4 MPD, no cap, earns on all spend
-- CITI REWARDS: 4 MPD online, $1000 cap per statement month
-- HSBC REVO: 4 MPD contactless, $1000 cap per calendar month
-- UOB PPV Contactless/Online: 4 MPD, $600 cap each
-- DBS WWMC: 4 MPD online only, $1000 cap
-- OCBC REWARDS: 4 MPD online MCC, $1110 cap
-- UOB VS SGD/FCY: 4 MPD, $1200 cap each, min $1K spend to activate
+Card matching — the user will often write abbreviated/lowercase card names, match them:
+- "hsbc revo" or "hsbc" → HSBC REVO
+- "citi rewards" or "citi" → CITI REWARDS
+- "dbs wwmc" or "dbs" or "wwmc" → DBS WWMC
+- "ocbc rewards" or "ocbc" → OCBC REWARDS
+- "uob ppv contactless" or "ppv contactless" or "ppv" → UOB PPV Contactless
+- "uob ppv online" or "ppv online" → UOB PPV Online
+- "uob privi" or "privi" → UOB PRIVI
+- "uob vs sgd" or "vs sgd" → UOB VS SGD
+- "uob vs fcy" or "vs fcy" → UOB VS FCY
+- "trust" → TRUST
 
-Rules:
-- If no card is mentioned, default to "Cash"
-- If no category is clear, infer from the description
-- The first standalone number is the total amount
-- Split rules (apply in this order):
-    1. "split 3" or "my share 3" or "i pay 3" — my_amt = that specific number (e.g. split 3 means you pay $3)
-    2. "split half", "split equally", "half" — my_amt = total / 2
-    3. "split" with no amount — my_amt = total / 2
-    4. no split mentioned — my_amt = total
-- "yes" or "no" at the end of the message = qualifying charge override
+Amount parsing — message format is: [total] [my_share?] [description] [card?] [yes/no?]
+- If ONE number at the start: that is total, and my_amt = total (full amount is yours)
+- If TWO numbers at the start: first is total, second is your share (my_amt)
+  e.g. "14.1 1 grab to kallang hsbc revo" → total=14.1, my_amt=1.00
+  e.g. "39.15 los tacos citi rewards" → total=39.15, my_amt=39.15
+- Numbers with decimals like 14.1 are valid amounts (do not require two decimal places)
+- "split N" or "my share N" or "i pay N" → my_amt = N
+- "split half" / "split equally" / "half" → my_amt = total / 2
+- "split" alone → my_amt = total / 2
+
+Qualifying charge:
+- "yes" at the end → qualifying = "Yes"
+- "no" at the end → qualifying = "No"
+- Cash transactions → qualifying = "No" by default
+- All other cards → qualifying = "Yes" by default
+
+Other rules:
+- If no card mentioned → default to "Cash"
+- Infer category from description (grab/uber = Transport, food/coffee/restaurant = Food, shopee/taobao = Shopping, etc.)
 - Dates: if not mentioned, use today ({date.today().isoformat()})
-- qualifying: "Yes" unless it's a cash transaction or user says "no"
 
 Respond ONLY with a JSON object, no other text:
 {{
   "date": "YYYY-MM-DD",
-  "desc": "merchant/description",
+  "desc": "merchant/description (title case, clean)",
   "category": "one of the categories",
   "total": 0.00,
   "my_amt": 0.00,
-  "card": "card name",
+  "card": "exact card name from the list",
   "qualifying": "Yes or No",
   "confidence": "high/medium/low",
   "note": "any clarification needed or empty string"
@@ -791,154 +802,168 @@ async def cmd_help(update, ctx): await cmd_start(update, ctx)
 
 async def cmd_recent(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update): return await reject(update)
-    rows=fetch_transactions(limit=10)
-    if not rows: return await update.message.reply_text("No transactions yet.")
-    lines=["*Recent transactions:*\n"]
+    today = date.today().isoformat()
+    conn = get_conn()
+    cur = conn.execute(
+        "SELECT * FROM transactions WHERE date<=? ORDER BY date DESC, id DESC LIMIT 10",
+        (today,)
+    )
+    rows = _rows_to_dicts(cur, cur.fetchall())
+    conn.close()
+    if not rows:
+        return await update.message.reply_text("No transactions yet.")
+    lines = ["Recent transactions (up to today):\n"]
     for t in rows:
-        sp=f" \\(you: ${t['my_amt']:.2f}\\)" if abs(t["my_amt"]-t["total"])>0.01 else ""
-        lines.append(f"`#{t['id']}` {CAT_EMOJI.get(t['category'],'📌')} *{esc(t['desc'])}*\n"
-                     f"   ${t['total']:.2f}{sp} · {esc(t['card'])} · {t['date']}\n"
-                     f"   _{esc(t['category'])}_")
-    try:
-        await update.message.reply_text("\n\n".join(lines), parse_mode="MarkdownV2")
-    except Exception:
-        # Fall back to plain text if MarkdownV2 fails due to special chars
-        plain = []
-        for t in rows:
-            sp = f" (you: ${t['my_amt']:.2f})" if abs(t["my_amt"]-t["total"])>0.01 else ""
-            plain.append(f"#{t['id']} {t['desc']}\n  ${t['total']:.2f}{sp} · {t['card']} · {t['date']}\n  {t['category']}")
-        await update.message.reply_text("Recent transactions:\n\n" + "\n\n".join(plain))
+        sp = f" (you: ${t['my_amt']:.2f})" if abs(t["my_amt"]-t["total"])>0.01 else ""
+        lines.append(f"#{t['id']} {t['desc']}\n  ${t['total']:.2f}{sp} | {t['card']} | {t['date']}\n  {t['category']}")
+    await update.message.reply_text("\n\n".join(lines))
 
 async def cmd_summary(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update): return await reject(update)
-    now=datetime.now()
-    cats,total_exp,count,_=get_monthly_summary(now.year,now.month)
-    rec=get_recurring()
-    rec_total=sum(r["amount"] for r in rec)
-    if not cats: return await update.message.reply_text(f"No expenses for {now.strftime('%B %Y')} yet.")
-    lines=[f"📊 *{esc(now.strftime('%B %Y'))}* — {count} transactions\n"]
+    now = datetime.now()
+    today = date.today().isoformat()
+    ym = f"{now.year:04d}-{now.month:02d}"
+    conn = get_conn()
+    cur = conn.execute(
+        "SELECT category, SUM(my_amt) as total FROM transactions"
+        " WHERE strftime('%Y-%m',date)=? AND type='expense' AND date<=?"
+        " GROUP BY category ORDER BY total DESC",
+        (ym, today))
+    cats = _rows_to_dicts(cur, cur.fetchall())
+    r2 = conn.execute("SELECT SUM(my_amt) FROM transactions WHERE strftime('%Y-%m',date)=? AND type='expense' AND date<=?", (ym, today)).fetchone()
+    r3 = conn.execute("SELECT COUNT(*) FROM transactions WHERE strftime('%Y-%m',date)=? AND type='expense' AND date<=?", (ym, today)).fetchone()
+    conn.close()
+    total_exp = (r2[0] or 0)
+    count = (r3[0] or 0)
+    rec = get_recurring()
+    rec_total = sum(r["amount"] for r in rec)
+    bal = 6050 - total_exp - rec_total
+    lines = [f"📊 {now.strftime('%B %Y')} — {count} transactions\n"]
     for r in cats:
-        bar_len=int((r["total"]/total_exp)*12) if total_exp else 0
-        lines.append(f"{CAT_EMOJI.get(r['category'],'📌')} {esc(r['category'])}\n"
-                     f"`{'█'*bar_len+'░'*(12-bar_len)}` ${r['total']:.2f}")
-    lines.append(f"\n💸 *Variable: ${total_exp:.2f}*")
-    lines.append(f"🔁 *Recurring: ${rec_total:.2f}*")
-    lines.append(f"💰 *Balance: ${6050-total_exp-rec_total:.2f}*")
-    await update.message.reply_text("\n\n".join(lines), parse_mode="MarkdownV2")
+        bar_len = int((r["total"]/total_exp)*12) if total_exp else 0
+        bar = "█"*bar_len + "░"*(12-bar_len)
+        lines.append(f"{CAT_EMOJI.get(r['category'],'📌')} {r['category']}\n[{bar}] ${r['total']:.2f}")
+    lines.append(f"\n💸 Variable: ${total_exp:.2f}")
+    lines.append(f"🔁 Recurring: ${rec_total:.2f}")
+    lines.append(f"💰 Balance: ${bal:.2f} ({'surplus' if bal>=0 else 'deficit'})")
+    await update.message.reply_text("\n\n".join(lines))
 
 async def cmd_miles(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update): return await reject(update)
-    now=datetime.now()
-    ym=f"{now.year:04d}-{now.month:02d}"
-    conn=get_conn()
-    rows=conn.execute("""
-        SELECT card, SUM(total) as spent FROM transactions
-        WHERE strftime('%Y-%m',date)=? AND type='expense' AND qualifying='Yes'
-        GROUP BY card
-    """, (ym,)).fetchall()
-    conn.close()
-    spend_map={r["card"]:r["spent"] for r in rows}
-    lines=[f"✈️ *Miles tracker — {esc(now.strftime('%B %Y'))}*\n"]
-    total_miles=0
-    for card,(cap,mpd,mult,note) in CARD_CAPS.items():
-        spent=spend_map.get(card,0)
-        if spent==0 and cap is not None: continue
-        emoji=CARD_EMOJI.get(card,"💳")
-        if cap is None:
-            miles=round(spent*mpd)
-            status="🟢"; cap_line="No cap"
+    import calendar as cal
+    now = datetime.now()
+    today = date.today().isoformat()
+    def card_window(card_id):
+        if card_id == "CITI REWARDS":
+            if now.day >= 6:
+                s = now.replace(day=6)
+                em, ey = (now.month+1, now.year) if now.month<12 else (1, now.year+1)
+                e = now.replace(year=ey, month=em, day=5)
+            else:
+                pm, py = (now.month-1, now.year) if now.month>1 else (12, now.year-1)
+                s = now.replace(year=py, month=pm, day=6)
+                e = now.replace(day=5)
+            return s.strftime("%Y-%m-%d"), e.strftime("%Y-%m-%d"), f"{s.strftime('%d %b')} - {e.strftime('%d %b')}"
         else:
-            pct=min(spent/cap,1.0)
-            filled=int(pct*10)
-            bar="█"*filled+"░"*(10-filled)
-            rem=max(0,cap-spent)
-            status="🔴" if spent>=cap else ("🟡" if pct>=0.8 else "🟢")
-            cap_line=f"CAP REACHED (${spent:.0f}/${cap:.0f})" if spent>=cap else f"${rem:.0f} to cap"
-            miles=round(min(spent,cap)*mpd*mult)
-        total_miles+=miles
-        lines.append(
-            f"{status} {emoji} *{esc(card)}*\n"
-            f"   `{bar if cap else '∞'}` ${spent:.0f} spent\n"
-            f"   {esc(cap_line)} · ~{miles:,} miles"
-        )
-    lines.append(f"\n🌏 *Est\\. miles this month: {total_miles:,}*")
-    await update.message.reply_text("\n\n".join(lines), parse_mode="MarkdownV2")
+            last = cal.monthrange(now.year, now.month)[1]
+            return now.replace(day=1).strftime("%Y-%m-%d"), now.replace(day=last).strftime("%Y-%m-%d"), now.strftime("%B %Y")
+    lines = ["✈️ Miles tracker\n"]
+    total_miles = 0
+    conn = get_conn()
+    for card, (cap, mpd, mult, note) in CARD_CAPS.items():
+        start, end, label = card_window(card)
+        eff_end = min(end, today)
+        cur = conn.execute(
+            "SELECT SUM(total) as spent FROM transactions"
+            " WHERE card=? AND date>=? AND date<=? AND type='expense' AND qualifying='Yes'",
+            (card, start, eff_end))
+        row = cur.fetchone()
+        spent = (row[0] or 0) if row else 0
+        if spent == 0 and cap is not None:
+            continue
+        emoji = CARD_EMOJI.get(card, "💳")
+        if cap is None:
+            miles = round(spent * mpd)
+            cap_line = "No cap"
+            status = "🟢"
+            bar = "∞"
+        else:
+            pct = min(spent/cap, 1.0)
+            filled = int(pct*10)
+            bar = "█"*filled + "░"*(10-filled)
+            rem = max(0, cap-spent)
+            status = "🔴" if spent>=cap else ("🟡" if pct>=0.8 else "🟢")
+            cap_line = f"CAP REACHED (${spent:.0f}/${cap:.0f})" if spent>=cap else f"${rem:.0f} to cap"
+            miles = round(min(spent,cap)*mpd*mult)
+        total_miles += miles
+        lines.append(f"{status} {emoji} {card}\n  [{bar}] ${spent:.0f} ({label})\n  {cap_line} | ~{miles:,} miles")
+    conn.close()
+    lines.append(f"\nTotal est. miles: {total_miles:,}")
+    await update.message.reply_text("\n\n".join(lines))
 
 async def cmd_recurring(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update): return await reject(update)
-    rec=get_recurring()
+    rec = get_recurring()
     if not rec:
-        return await update.message.reply_text(
-            "No recurring items set\\. Add them on the dashboard at /recurring",
-            parse_mode="MarkdownV2")
-    total=sum(r["amount"] for r in rec)
-    lines=[f"🔁 *Recurring expenses*\n"]
+        return await update.message.reply_text("No recurring items. Add them on the dashboard.")
+    total = sum(r["amount"] for r in rec)
+    lines = ["🔁 Recurring expenses\n"]
     for r in rec:
-        lines.append(
-            f"`#{r['id']}` {CAT_EMOJI.get(r['category'],'📌')} *{esc(r['name'])}*\n"
-            f"   ${r['amount']:.2f}/mo · {esc(r['category'])}"
-        )
-    lines.append(f"\n💸 *Total: ${total:.2f}/mo*")
-    lines.append("\nTo update: `/recurring set <id> <amount>`\nTo add/remove: use the dashboard")
-    await update.message.reply_text("\n\n".join(lines), parse_mode="MarkdownV2")
+        lines.append(f"#{r['id']} {r['name']}\n  ${r['amount']:.2f}/mo | {r['category']}")
+    lines.append(f"\nTotal: ${total:.2f}/mo")
+    lines.append("\nTo update: /recurring set <id> <amount>")
+    await update.message.reply_text("\n\n".join(lines))
 
 async def cmd_recurring_set(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Handle /recurring set <id> <amount>"""
     if not is_allowed(update): return await reject(update)
-    args=ctx.args  # ["set","3","500"] or ["3","500"]
-    # filter out "set" keyword if present
-    args=[a for a in args if a.lower()!="set"]
-    if len(args)<2:
-        return await update.message.reply_text(
-            "Usage: `/recurring set <id> <amount>`\nExample: `/recurring set 1 500`",
-            parse_mode="MarkdownV2")
+    args = [a for a in ctx.args if a.lower() != "set"]
+    if len(args) < 2:
+        return await update.message.reply_text("Usage: /recurring set <id> <amount>\nExample: /recurring set 1 500")
     try:
-        rid=int(args[0]); amount=float(args[1])
-        update_recurring(rid,amount)
-        await update.message.reply_text(f"✅ Recurring item #{rid} updated to ${amount:.2f}/mo")
+        rid = int(args[0]); amount = float(args[1])
+        update_recurring(rid, amount)
+        await update.message.reply_text(f"✅ Recurring #{rid} updated to ${amount:.2f}/mo")
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {e}")
 
 async def cmd_edit(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update): return await reject(update)
-    args=ctx.args
-    if len(args)<3:
+    args = ctx.args
+    if len(args) < 3:
         return await update.message.reply_text(
-            "*Usage:* `/edit <id> <field> <value>`\n\n"
-            "*Fields:* `desc` `date` `total` `my_amt` `category` `card` `qualifying`\n\n"
-            "*Examples:*\n"
-            "`/edit 42 total 8.50`\n"
-            "`/edit 42 card HSBC REVO`\n"
-            "`/edit 42 category Groceries`\n"
-            "`/edit 42 desc Starbucks Suntec`\n"
-            "`/edit 42 qualifying No`",
-            parse_mode="MarkdownV2")
+            "Usage: /edit <id> <field> <value>\n\n"
+            "Fields: desc  date  total  my_amt  category  card  qualifying\n\n"
+            "Examples:\n"
+            "/edit 42 total 8.50\n"
+            "/edit 42 card HSBC REVO\n"
+            "/edit 42 category Groceries\n"
+            "/edit 42 desc Starbucks Suntec\n"
+            "/edit 42 qualifying No")
     try:
-        tid=int(args[0])
-        field=args[1].lower()
-        value=" ".join(args[2:])  # allow multi-word values like card names
-        t=get_transaction(tid)
+        tid = int(args[0])
+        field = args[1].lower()
+        value = " ".join(args[2:])
+        t = get_transaction(tid)
         if not t:
-            return await update.message.reply_text(f"❌ No transaction #{tid} found\\. Check /recent for IDs\\.", parse_mode="MarkdownV2")
-        ok,msg=update_transaction(tid,field,value)
+            return await update.message.reply_text(f"❌ No transaction #{tid}. Check /recent for IDs.")
+        ok, msg = update_transaction(tid, field, value)
         if ok:
-            t=get_transaction(tid)
+            t = get_transaction(tid)
             await update.message.reply_text(
-                f"✅ Updated \\#{tid}\n\n"
-                f"{CAT_EMOJI.get(t['category'],'📌')} *{esc(t['desc'])}*\n"
-                f"   ${t['total']:.2f} · {esc(t['card'])} · {t['date']}\n"
-                f"   _{esc(t['category'])}_",
-                parse_mode="MarkdownV2")
+                f"✅ Updated #{tid}\n\n"
+                f"{CAT_EMOJI.get(t['category'],'📌')} {t['desc']}\n"
+                f"  ${t['total']:.2f} | {t['card']} | {t['date']}\n"
+                f"  {t['category']}")
         else:
-            await update.message.reply_text(f"❌ {esc(msg)}", parse_mode="MarkdownV2")
+            await update.message.reply_text(f"❌ {msg}")
     except ValueError:
-        await update.message.reply_text("❌ ID must be a number\\. Example: `/edit 42 total 8.50`", parse_mode="MarkdownV2")
+        await update.message.reply_text("❌ ID must be a number. Example: /edit 42 total 8.50")
 
 async def cmd_delete(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update): return await reject(update)
     if not ctx.args or not ctx.args[0].isdigit():
         return await update.message.reply_text("Usage: /delete <id>  (get IDs from /recent)")
-    ok=delete_transaction(int(ctx.args[0]))
+    ok = delete_transaction(int(ctx.args[0]))
     await update.message.reply_text(f"✅ Deleted #{ctx.args[0]}." if ok else f"❌ No transaction #{ctx.args[0]}.")
 
 async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -954,21 +979,45 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             return await cmd_recurring_set(update,ctx)
 
     if uid in pending:
-        exp=pending[uid]
-        if text.lower() in ("yes","y","✅","ok","yep","yeah","confirm"):
-            tid=insert_transaction(exp["date"],exp["desc"],exp["category"],
-                                   exp["total"],exp["my_amt"],exp["card"],exp["qualifying"])
+        exp = pending[uid]
+        tl = text.lower().strip()
+        if tl in ("yes","y","✅","ok","yep","yeah","confirm"):
+            tid = insert_transaction(exp["date"],exp["desc"],exp["category"],
+                                    exp["total"],exp["my_amt"],exp["card"],exp["qualifying"])
             del pending[uid]
-            sp=f"\n   You pay: *${exp['my_amt']:.2f}*" if abs(exp["my_amt"]-exp["total"])>0.01 else ""
+            sp = f" (you: ${exp['my_amt']:.2f})" if abs(exp["my_amt"]-exp["total"])>0.01 else ""
             await update.message.reply_text(
-                f"✅ Saved \\#{tid}\n\n"
-                f"{CAT_EMOJI.get(exp['category'],'📌')} *{esc(exp['desc'])}*\n"
-                f"   ${exp['total']:.2f}{sp}\n"
-                f"   {CARD_EMOJI.get(exp['card'],'💳')} {esc(exp['card'])} · {esc(exp['category'])} · {exp['date']}",
-                parse_mode="MarkdownV2"); return
-        elif text.lower() in ("no","n","❌","cancel","nope"):
+                f"✅ Saved #{tid}\n\n"
+                f"{CAT_EMOJI.get(exp['category'],'📌')} {exp['desc']}\n"
+                f"  ${exp['total']:.2f}{sp} | {exp['card']} | {exp['date']}\n"
+                f"  {exp['category']} | Qualifying: {exp['qualifying']}"
+            ); return
+        elif tl in ("no","n","❌","cancel","nope"):
             del pending[uid]
             await update.message.reply_text("❌ Cancelled."); return
+        elif tl in ("qualifying","q","y qualifying","yes qualifying"):
+            pending[uid]["qualifying"] = "Yes"
+            await update.message.reply_text(
+                f"✅ Marked as qualifying. Reply yes to save or no to cancel.\n"
+                f"{exp['desc']} | ${exp['total']:.2f} | {exp['card']}"
+            ); return
+        elif tl in ("not qualifying","nq","n qualifying","no qualifying","not"):
+            pending[uid]["qualifying"] = "No"
+            await update.message.reply_text(
+                f"✅ Marked as NOT qualifying. Reply yes to save or no to cancel.\n"
+                f"{exp['desc']} | ${exp['total']:.2f} | {exp['card']}"
+            ); return
+        else:
+            exp = pending[uid]
+            sp = f" (you: ${exp['my_amt']:.2f})" if abs(exp["my_amt"]-exp["total"])>0.01 else ""
+            msg = (
+                "⚠️ Still waiting for confirmation:\n\n"
+                + f"{CAT_EMOJI.get(exp['category'],'📌')} {exp['desc']}\n"
+                + f"  ${exp['total']:.2f}{sp} | {exp['card']} | {exp['date']}\n\n"
+                + "Reply yes to save, no to cancel."
+            )
+            await update.message.reply_text(msg)
+            return
 
     thinking=await update.message.reply_text("⏳ Parsing…")
     try: parsed=parse_expense_with_claude(text)
@@ -983,18 +1032,24 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🤔 I couldn't find an expense\\. Try: `39 los tacos citi rewards`", parse_mode="MarkdownV2")
         return
 
-    pending[uid]=parsed
-    sp=f"\n   Your share: *${parsed['my_amt']:.2f}*" if abs(parsed.get("my_amt",0)-parsed.get("total",0))>0.01 else ""
-    note=f"\n   _{esc(parsed['note'])}_" if parsed.get("note") else ""
-    conf={"high":"✅","medium":"🟡","low":"⚠️"}.get(parsed.get("confidence","high"),"✅")
-    await update.message.reply_text(
-        f"{conf} *Got it — confirm?*\n\n"
-        f"{CAT_EMOJI.get(parsed.get('category',''),'📌')} *{esc(parsed.get('desc',''))}*\n"
-        f"   ${parsed.get('total',0):.2f}{sp}\n"
-        f"   {CARD_EMOJI.get(parsed.get('card',''),'💳')} {esc(parsed.get('card',''))} · {esc(parsed.get('category',''))}\n"
-        f"   📅 {parsed.get('date','')}{note}\n\n"
-        "Reply *yes* to save or *no* to cancel",
-        parse_mode="MarkdownV2")
+    pending[uid] = parsed
+    sp = f" (you: ${parsed['my_amt']:.2f})" if abs(parsed.get("my_amt",0)-parsed.get("total",0))>0.01 else ""
+    qual = parsed.get("qualifying","Yes")
+    qual_line = f"  Qualifying: {qual}"
+    # Flag if qualifying was not explicitly stated by user (Claude inferred it)
+    user_text_lower = text.lower()
+    qual_explicit = any(w in user_text_lower for w in ("yes","no","qualifying","not qualifying"))
+    if not qual_explicit and parsed.get("card","") != "Cash":
+        qual_line = "  Qualifying? — reply YES or NO (or confirm/cancel)"
+    msg = (
+        "Got it — confirm?\n\n"
+        + f"{CAT_EMOJI.get(parsed.get('category',''),'📌')} {parsed.get('desc','')}\n"
+        + f"  ${parsed.get('total',0):.2f}{sp} | {parsed.get('card','')} | {parsed.get('date','')}\n"
+        + f"  {parsed.get('category','')}\n"
+        + qual_line + "\n\n"
+        + "yes = save  |  no = cancel"
+    )
+    await update.message.reply_text(msg)
 
 # ── MAIN ──────────────────────────────────────────────────────────
 def run_flask():
