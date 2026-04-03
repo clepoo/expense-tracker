@@ -880,11 +880,10 @@ async def cmd_miles(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     conn = get_conn()
     for card, (cap, mpd, mult, note) in CARD_CAPS.items():
         start, end, label = card_window(card)
-        eff_end = min(end, today)
         cur = conn.execute(
             "SELECT SUM(total) as spent FROM transactions"
             " WHERE card=? AND date>=? AND date<=? AND type='expense' AND qualifying='Yes'",
-            (card, start, eff_end))
+            (card, start, end))
         row = cur.fetchone()
         spent = (row[0] or 0) if row else 0
         if spent == 0 and cap is not None:
