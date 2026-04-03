@@ -322,7 +322,15 @@ def parse_expense_with_claude(text):
         model="claude-sonnet-4-20250514", max_tokens=400,
         system=PARSE_SYSTEM, messages=[{"role":"user","content":text}]
     )
-    raw = resp.content[0].text.strip().replace("```json","").replace("```","").strip()
+    raw = resp.content[0].text.strip()
+    # Strip markdown fences
+    raw = raw.replace("```json","").replace("```","").strip()
+    # Extract JSON object if wrapped in other text
+    if not raw.startswith("{"):
+        start = raw.find("{")
+        end = raw.rfind("}") + 1
+        if start >= 0 and end > start:
+            raw = raw[start:end]
     return json.loads(raw)
 
 # ── FLASK DASHBOARD ───────────────────────────────────────────────
@@ -1020,11 +1028,15 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             return
 
     thinking=await update.message.reply_text("⏳ Parsing…")
-    try: parsed=parse_expense_with_claude(text)
+    try:
+        parsed = parse_expense_with_claude(text)
     except Exception as e:
-        log.error(f"Parse error: {e}")
+        log.error(f"Parse error: {e!r}")
         await thinking.delete()
-        await update.message.reply_text("⚠️ Couldn't parse that. Try: `45.50 luckin coffee citi rewards`")
+        await update.message.reply_text(
+            f"⚠️ Parse failed: {e}\n\n"
+            "Try: 14.1 grab to kallang hsbc revo yes"
+        )
         return
 
     await thinking.delete()
