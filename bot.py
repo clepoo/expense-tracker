@@ -178,6 +178,23 @@ def delete_transaction(tid):
     db_commit(conn); conn.close()
     return True
 
+def _card_window(year, month, card_id):
+    """Return (start_date, end_date) for a card's statement period given a display month."""
+    import calendar as _cal
+    if card_id == "CITI REWARDS":
+        # Statement: 6th of month to 5th of next month
+        start = f"{year:04d}-{month:02d}-06"
+        if month == 12:
+            end = f"{year+1:04d}-01-05"
+        else:
+            end = f"{year:04d}-{month+1:02d}-05"
+    else:
+        # Calendar month
+        last = _cal.monthrange(year, month)[1]
+        start = f"{year:04d}-{month:02d}-01"
+        end = f"{year:04d}-{month:02d}-{last:02d}"
+    return start, end
+
 def get_monthly_summary(year, month):
     conn = get_conn()
     ym = f"{year:04d}-{month:02d}"
@@ -191,12 +208,23 @@ def get_monthly_summary(year, month):
     total_exp = (cur2.fetchone()[0] or 0)
     cur3 = conn.execute("SELECT COUNT(*) FROM transactions WHERE strftime('%Y-%m',date)=? AND type='expense'", (ym,))
     count = (cur3.fetchone()[0] or 0)
-    cur4 = conn.execute("""
-        SELECT card, SUM(total) as total FROM transactions
-        WHERE strftime('%Y-%m',date)=? AND type='expense' AND qualifying='Yes'
-        GROUP BY card ORDER BY total DESC
-    """, (ym,))
-    card_spend = _rows_to_dicts(cur4, cur4.fetchall())
+    # Per-card spend using correct statement windows
+    card_totals = {}
+    for card in CARDS:
+        start, end = _card_window(year, month, card)
+        cur4 = conn.execute(
+            "SELECT SUM(total) as total FROM transactions"
+            " WHERE card=? AND date>=? AND date<=? AND type='expense' AND qualifying='Yes'",
+            (card, start, end)
+        )
+        row = cur4.fetchone()
+        total = (row[0] or 0) if row else 0
+        if total > 0:
+            card_totals[card] = total
+    card_spend = sorted(
+        [{"card": c, "total": t} for c, t in card_totals.items()],
+        key=lambda x: x["total"], reverse=True
+    )
     conn.close()
     return cats, total_exp, count, card_spend
 
@@ -392,7 +420,7 @@ select option{background:var(--surface2)}
 .bar-label{font-size:12px;width:160px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bar-track{flex:1;height:6px;background:var(--surface3);border-radius:3px;overflow:hidden}
 .bar-fill{height:100%;border-radius:3px}
-.bar-val{font-size:12px;color:var(--muted);width:72px;text-align:right;flex-shrink:0}
+.bar-val{font-size:11px;color:var(--muted);width:160px;text-align:right;flex-shrink:0}
 .month-nav{display:flex;align-items:center;gap:10px;margin-bottom:20px}
 .month-nav a{background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:6px;font-size:13px}
 .month-nav a:hover{border-color:var(--border2);color:var(--text)}
@@ -487,12 +515,38 @@ def dashboard():
         f'<div class="bar-val">${r["total"]:,.2f}</div></div>' for r in cats
     ) if cats else '<div class="empty">No expenses</div>'
 
-    mx2=card_spend[0]["total"] if card_spend else 1
-    card_bars="".join(
-        f'<div class="bar-row"><div class="bar-label">{CARD_EMOJI.get(r["card"],"💳")} {r["card"]}</div>'
-        f'<div class="bar-track"><div class="bar-fill" style="width:{r["total"]/mx2*100:.1f}%;background:{CARD_COLORS.get(r["card"],"#888")}"></div></div>'
-        f'<div class="bar-val">${r["total"]:,.2f}</div></div>' for r in card_spend
-    ) if card_spend else '<div class="empty">No card spend</div>'
+    def make_card_bar(r):
+        card = r["card"]
+        spent = r["total"]
+        cap_info = CARD_CAPS.get(card)
+        cap = cap_info[0] if cap_info else None
+        color = CARD_COLORS.get(card, "#888")
+        if cap is None:
+            # No cap — bar fill relative to max spender
+            mx2 = card_spend[0]["total"] if card_spend else 1
+            pct = spent / mx2 * 100
+            cap_label = f"${spent:,.2f} · no cap"
+            bar_color = color
+        else:
+            pct = min(spent / cap * 100, 100)
+            rem = max(0, cap - spent)
+            if pct >= 100:
+                cap_label = f"${spent:,.2f} / ${cap:,.0f} · CAPPED"
+                bar_color = "var(--red)"
+            elif pct >= 80:
+                cap_label = f"${spent:,.2f} / ${cap:,.0f} · ${rem:,.0f} left"
+                bar_color = "var(--amber)"
+            else:
+                cap_label = f"${spent:,.2f} / ${cap:,.0f} · ${rem:,.0f} left"
+                bar_color = color
+        return (
+            f'<div class="bar-row">'
+            f'<div class="bar-label">{CARD_EMOJI.get(card,"💳")} {card}</div>'
+            f'<div class="bar-track"><div class="bar-fill" style="width:{pct:.1f}%;background:{bar_color}"></div></div>'
+            f'<div class="bar-val" style="font-size:11px;width:160px;text-align:right">{cap_label}</div>'
+            f'</div>'
+        )
+    card_bars = "".join(make_card_bar(r) for r in card_spend) if card_spend else '<div class="empty">No card spend</div>'
 
     def trow(t):
         sp=f' <span class="tag">you: ${t["my_amt"]:.2f}</span>' if abs(t["my_amt"]-t["total"])>0.01 else ""
