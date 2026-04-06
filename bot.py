@@ -127,6 +127,11 @@ def init_db():
         """CREATE TABLE IF NOT EXISTS recurring (
             id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
             amount REAL NOT NULL, category TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1)""",
+        """CREATE TABLE IF NOT EXISTS logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, category TEXT NOT NULL,
+            date TEXT NOT NULL, desc TEXT NOT NULL, amount REAL NOT NULL DEFAULT 0,
+            note TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL)""",
+        """CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, data TEXT NOT NULL)""",
     ]:
         conn.execute(stmt)
     db_commit(conn)
@@ -297,6 +302,91 @@ def delete_sale(sid):
     db_commit(conn); conn.close()
     return True
 
+
+# ── SKIN PACKAGE DB ───────────────────────────────────────────────
+def get_become_package():
+    """Load from storage or return defaults."""
+    conn = get_conn()
+    try:
+        cur = conn.execute("SELECT data FROM kv_store WHERE key='become_package'")
+        row = cur.fetchone()
+        conn.close()
+        if row:
+            import json as _json
+            return _json.loads(row[0])
+    except:
+        conn.close()
+    return BECOME_PACKAGE_DEFAULT
+
+def save_become_package(data):
+    import json as _json
+    conn = get_conn()
+    try:
+        conn.execute("CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, data TEXT NOT NULL)")
+        conn.execute("INSERT OR REPLACE INTO kv_store (key, data) VALUES ('become_package', ?)", (_json.dumps(data),))
+        db_commit(conn)
+    except Exception as e:
+        log.error(f"save_become_package: {e}")
+    finally:
+        conn.close()
+
+# ── LOGS DB ───────────────────────────────────────────────────────
+LOG_CATEGORIES = ["Driving","Invisalign","Lasik","Skin Treatments","Other"]
+
+# Skin treatment price list
+SKIN_PRICES = {
+    "HIFU 800 Shots":           300,
+    "Sylfirm X":                500,
+    "Yellow Laser":             150,
+    "Juvelook":                 300,
+    "Jaw Botox (60+70 Units)":  600,
+    "Rejuran":                  300,
+    "Titanium Lifting":         375,
+}
+
+# Become Aesthetics package tracker (update manually via dashboard)
+BECOME_PACKAGE_DEFAULT = [
+    {"treatment": "HIFU",             "used": 1,  "total": 7},
+    {"treatment": "Sylfirm X",        "used": 1,  "total": 6},
+    {"treatment": "Juvelook",         "used": 4,  "total": 8},
+    {"treatment": "Yellow Laser",     "used": 4,  "total": 20},
+    {"treatment": "Rejuran",          "used": 0,  "total": 4},
+    {"treatment": "Titanium Lifting", "used": 0,  "total": 4},
+]
+
+# Fifty Freed package
+FIFTY_FREED = {
+    "paid": 588,
+    "value": 646,
+    "used": [
+        {"date": "2024-01-18", "amount": 74.00},
+        {"date": "2024-03-09", "amount": 106.00},
+        {"date": "2024-08-11", "amount": 145.87},
+        {"date": "2025-03-15", "amount": 158.40},
+    ]
+}
+
+def get_logs(category=None):
+    conn = get_conn()
+    if category:
+        cur = conn.execute("SELECT * FROM logs WHERE category=? ORDER BY date DESC, id DESC", (category,))
+    else:
+        cur = conn.execute("SELECT * FROM logs ORDER BY category, date ASC, id ASC")
+    rows = _rows_to_dicts(cur, cur.fetchall())
+    conn.close()
+    return rows
+
+def insert_log(category, date_, desc, amount, note=""):
+    conn = get_conn()
+    conn.execute("INSERT INTO logs (category,date,desc,amount,note,created_at) VALUES (?,?,?,?,?,?)",
+                 (category, date_, desc, round(float(amount),2), note, now_sgt().isoformat()))
+    db_commit(conn); conn.close()
+
+def delete_log(lid):
+    conn = get_conn()
+    conn.execute("DELETE FROM logs WHERE id=?", (lid,))
+    db_commit(conn); conn.close()
+
 # ── CLAUDE PARSER ─────────────────────────────────────────────────
 def build_parse_system():
     """Build fresh each call so today_sgt() is always correct."""
@@ -466,7 +556,7 @@ function toggleEdit(id){{
 
 def make_nav(active):
     tabs=[("/","dashboard","Dashboard"),("/add","add","Add"),("/history","history","History"),
-          ("/sales","sales","Sales"),("/recurring","recurring","Recurring")]
+          ("/sales","sales","Sales"),("/recurring","recurring","Recurring"),("/logs","logs","Logs"),("/skin","skin","Skin")]
     t="".join(f'<a href="{h}" class="nav-tab{" active" if a==active else ""}">{l}</a>' for h,a,l in tabs)
     return (f'<nav><span class="brand">FinBot</span>{t}'
             f'<div class="nav-right"><form method="post" action="/logout" style="margin:0">'
@@ -840,6 +930,189 @@ def delete_entry(tid):
     if require_auth(): return redirect("/login")
     delete_transaction(tid); return redirect(request.form.get("back","/"))
 
+
+@flask_app.route("/logs", methods=["GET","POST"])
+def logs_page():
+    if require_auth(): return redirect("/login")
+    flash = ""
+    if request.method == "POST":
+        try:
+            insert_log(request.form["category"], request.form["date"],
+                       request.form["desc"].strip(),
+                       float(request.form.get("amount") or 0),
+                       request.form.get("note","").strip())
+            flash = '<div class="flash flash-ok">✅ Entry added.</div>'
+        except Exception as e:
+            flash = f'<div class="flash flash-err">Error: {e}</div>'
+
+    sel_cat = request.args.get("cat","")
+    logs = get_logs(sel_cat if sel_cat else None)
+
+    # Group by category with totals
+    from collections import defaultdict
+    grouped = defaultdict(list)
+    cat_totals = defaultdict(float)
+    for l in logs:
+        grouped[l["category"]].append(l)
+        cat_totals[l["category"]] += l["amount"]
+
+    # Category filter tabs
+    all_cats = sorted(set(l["category"] for l in get_logs()))
+    cat_tabs = "".join(
+        f'<a href="/logs?cat={c}" style="font-size:12px;padding:4px 12px;border-radius:20px;border:1px solid {"var(--green-mid)" if c==sel_cat else "var(--border)"};color:{"var(--green)" if c==sel_cat else "var(--muted)"};margin-right:6px">{c}</a>'
+        for c in all_cats
+    )
+    if sel_cat:
+        cat_tabs = f'<a href="/logs" style="font-size:12px;padding:4px 12px;border-radius:20px;border:1px solid var(--border);color:var(--muted);margin-right:6px">All</a>' + cat_tabs
+
+    # Build rows grouped by category
+    def log_row(l):
+        note_html = f'<span style="font-size:11px;color:var(--muted)"> · {l["note"]}</span>' if l["note"] else ""
+        return (
+            f'<div class="entry">'            f'<div class="einfo"><div class="ename">{l["desc"]}{note_html}</div>'            f'<div class="emeta">{l["date"]}</div></div>'            f'<div class="eamt" style="color:var(--text)">${l["amount"]:,.2f}</div>'            f'<form method="post" action="/logs/delete/{l["id"]}" style="margin:0">'            f'<button class="btn-sm btn-del">✕</button></form></div>'
+        )
+
+    sections = ""
+    for cat in (all_cats if not sel_cat else [sel_cat]):
+        entries = grouped.get(cat, [])
+        if not entries: continue
+        rows_html = "".join(log_row(l) for l in entries)
+        sections += (
+            f'<div class="card" style="margin-bottom:14px">'            f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'            f'<div class="card-title" style="margin:0">{cat}</div>'            f'<div style="font-size:13px;color:var(--amber)">Total: ${cat_totals[cat]:,.2f}</div></div>'            f'{rows_html}</div>'
+        )
+    if not sections:
+        sections = '<div class="empty">No log entries yet.</div>'
+
+    cat_opts = "".join(f"<option>{c}</option>" for c in LOG_CATEGORIES)
+    today = today_sgt().isoformat()
+
+    content = f"""
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 style="font-family:var(--serif);font-size:1.3rem;font-weight:400">Treatment & Cost Logs</h2>
+    </div>
+    {flash}
+    <div style="margin-bottom:16px">{cat_tabs}</div>
+    {sections}
+    <div class="card">
+      <div class="card-title">Add entry</div>
+      <form method="post">
+        <div class="row">
+          <div class="field"><label>Category</label><select name="category">{cat_opts}</select></div>
+          <div class="field"><label>Date</label><input type="date" name="date" value="{today}"></div>
+        </div>
+        <div class="field"><label>Description</label><input name="desc" placeholder="e.g. Invisalign tray 5, Sylfirm X session 2" required></div>
+        <div class="row">
+          <div class="field"><label>Amount</label><input type="number" name="amount" placeholder="0.00" step="0.01" min="0"></div>
+          <div class="field"><label>Note</label><input name="note" placeholder="e.g. Reimbursed $100"></div>
+        </div>
+        <button class="btn btn-primary">Add</button>
+      </form>
+    </div>"""
+    return render(content, "logs")
+
+
+@flask_app.route("/skin", methods=["GET","POST"])
+def skin_page():
+    if require_auth(): return redirect("/login")
+
+    # Handle session use update
+    if request.method == "POST" and request.form.get("action") == "update_package":
+        pkg = get_become_package()
+        for item in pkg:
+            key = f"used_{item['treatment'].replace(' ','_')}"
+            if key in request.form:
+                try:
+                    item["used"] = int(request.form[key])
+                except: pass
+        save_become_package(pkg)
+        return redirect("/skin")
+
+    pkg = get_become_package()
+
+    # Price list
+    price_rows = "".join(
+        f'<div class="bar-row"><div class="bar-label">{t}</div>'
+        f'<div style="flex:1"></div>'
+        f'<div class="bar-val" style="width:auto;color:var(--text);font-weight:500">${p}/session</div></div>'
+        for t, p in SKIN_PRICES.items()
+    )
+
+    # Become Aesthetics package
+    pkg_rows = ""
+    for item in pkg:
+        used = item["used"]
+        total = item["total"]
+        left = total - used
+        pct = min(used / total * 100, 100) if total > 0 else 0
+        color = "var(--green-mid)" if pct < 80 else ("var(--amber)" if pct < 100 else "var(--red)")
+        t = item["treatment"]
+        safe_key = t.replace(" ","_")
+        pkg_rows += (
+            f'<div class="entry" style="flex-wrap:wrap;gap:8px">'
+            f'<div class="einfo"><div class="ename">{t}</div>'
+            f'<div class="emeta">{used} used · {left} left · {total} total</div></div>'
+            f'<div style="flex:1;min-width:120px"><div class="bar-track" style="height:8px">'
+            f'<div class="bar-fill" style="width:{pct:.0f}%;background:{color}"></div></div></div>'
+            f'<form method="post" style="display:flex;align-items:center;gap:6px;margin:0">'
+            f'<input type="hidden" name="action" value="update_package">'
+            f'<label style="font-size:11px;color:var(--muted)">Used:</label>'
+            f'<input type="number" name="used_{safe_key}" value="{used}" min="0" max="{total}" '
+            f'style="width:60px;padding:4px 8px;font-size:12px">'
+            f'<button class="btn-sm btn-save" type="submit">Save</button>'
+            f'</form></div>'
+        )
+
+    # Fifty Freed package
+    ff = FIFTY_FREED
+    ff_used = sum(u["amount"] for u in ff["used"])
+    ff_left = round(ff["value"] - ff_used, 2)
+    ff_pct = min(ff_used / ff["value"] * 100, 100)
+    ff_color = "var(--green-mid)" if ff_pct < 80 else "var(--amber)"
+    ff_rows = "".join(
+        f'<div class="bar-row"><div class="bar-label">{u["date"]}</div>'
+        f'<div style="flex:1"></div>'
+        f'<div class="bar-val" style="width:auto">${u["amount"]:.2f}</div></div>'
+        for u in ff["used"]
+    )
+
+    content = f"""
+    <h2 style="font-family:var(--serif);font-size:1.3rem;font-weight:400;margin-bottom:20px">Skin Treatments</h2>
+
+    <div class="grid2" style="margin-bottom:16px">
+      <div class="card">
+        <div class="card-title">Price per session</div>
+        {price_rows}
+      </div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <div class="card-title" style="margin:0">Fifty Freed Package</div>
+          <div style="font-size:12px;color:var(--muted)">Paid ${ff["paid"]} · Value ${ff["value"]}</div>
+        </div>
+        <div class="bar-track" style="height:8px;margin-bottom:8px">
+          <div class="bar-fill" style="width:{ff_pct:.0f}%;background:{ff_color}"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:12px">
+          <span>${ff_used:.2f} used</span><span>${ff_left:.2f} remaining</span>
+        </div>
+        {ff_rows}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Become Aesthetics Package</div>
+      <form method="post">
+        {pkg_rows}
+      </form>
+    </div>
+    """
+    return render(content, "skin")
+
+@flask_app.route("/logs/delete/<int:lid>", methods=["POST"])
+def logs_delete(lid):
+    if require_auth(): return redirect("/login")
+    delete_log(lid)
+    return redirect(request.referrer or "/logs")
+
 @flask_app.route("/health")
 def health():
     return jsonify({"status":"ok"})
@@ -1132,11 +1405,38 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                                     exp["total"],exp["my_amt"],exp["card"],exp["qualifying"])
             del pending[uid]
             sp = f" (you: ${exp['my_amt']:.2f})" if abs(exp["my_amt"]-exp["total"])>0.01 else ""
+            # Auto-log to logs table if description matches known treatments
+            AUTO_LOG_KEYWORDS = {
+                "invisalign": "Invisalign",
+                "lasik": "Lasik",
+                "eagle eye": "Lasik",
+                "driving": "Driving",
+                "cdc": "Driving",
+                "hifu": "Skin Treatments",
+                "sylfirm": "Skin Treatments",
+                "juvelook": "Skin Treatments",
+                "fat freeze": "Skin Treatments",
+                "become aesthetics": "Skin Treatments",
+                "illumia": "Skin Treatments",
+                "tcm": "Other",
+                "yakson": "Skin Treatments",
+                "yuet beauty": "Skin Treatments",
+                "u aesthetic": "Skin Treatments",
+                "mono studio": "Skin Treatments",
+                "next studio": "Skin Treatments",
+            }
+            desc_lower = exp["desc"].lower()
+            auto_log_cat = next((cat for kw, cat in AUTO_LOG_KEYWORDS.items() if kw in desc_lower), None)
+            log_note = ""
+            if auto_log_cat:
+                insert_log(auto_log_cat, exp["date"], exp["desc"], exp["my_amt"])
+                log_note = f"\n  📋 Also logged to {auto_log_cat}"
             await update.message.reply_text(
                 f"✅ Saved #{tid}\n\n"
                 f"{CAT_EMOJI.get(exp['category'],'📌')} {exp['desc']}\n"
                 f"  ${exp['total']:.2f}{sp} | {exp['card']} | {exp['date']}\n"
                 f"  {exp['category']} | Qualifying: {exp['qualifying']}"
+                + log_note
             ); return
         elif tl in ("no","n","❌","cancel","nope"):
             del pending[uid]
