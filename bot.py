@@ -10,6 +10,14 @@ try:
 except ImportError:
     USE_TURSO = False
 from datetime import datetime, date
+from zoneinfo import ZoneInfo
+SGT = ZoneInfo("Asia/Singapore")
+
+def now_sgt():
+    return datetime.now(SGT)
+
+def today_sgt():
+    return datetime.now(SGT).date()
 from anthropic import Anthropic
 from flask import Flask, request, session, redirect, jsonify
 from telegram import Update
@@ -128,7 +136,7 @@ def insert_transaction(date_, desc, category, total, my_amt, card, qualifying="Y
     conn = get_conn()
     cur = conn.execute(
         "INSERT INTO transactions (date,desc,category,total,my_amt,card,qualifying,type,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
-        (date_, desc, category, round(total,2), round(my_amt,2), card, qualifying, typ, datetime.now().isoformat())
+        (date_, desc, category, round(total,2), round(my_amt,2), card, qualifying, typ, now_sgt().isoformat())
     )
     tid = cur.lastrowid
     db_commit(conn); conn.close()
@@ -280,7 +288,7 @@ def insert_sale(date_, desc, revenue, cost):
     conn = get_conn()
     profit = round(revenue-cost,2)
     conn.execute("INSERT INTO sales (date,desc,revenue,cost,profit,created_at) VALUES (?,?,?,?,?,?)",
-                 (date_, desc, round(revenue,2), round(cost,2), profit, datetime.now().isoformat()))
+                 (date_, desc, round(revenue,2), round(cost,2), profit, now_sgt().isoformat()))
     db_commit(conn); conn.close()
 
 def delete_sale(sid):
@@ -290,11 +298,16 @@ def delete_sale(sid):
     return True
 
 # ── CLAUDE PARSER ─────────────────────────────────────────────────
-PARSE_SYSTEM = f"""You are a finance expense parser for a Singapore user.
+def build_parse_system():
+    """Build fresh each call so today_sgt() is always correct."""
+    today = today_sgt().isoformat()
+    cards_str = ", ".join(CARDS)
+    cats_str = ", ".join(CATEGORIES)
+    return f"""You are a finance expense parser for a Singapore user.
 Parse the user's message into a JSON expense entry.
 
-Available cards (match case-insensitively): {", ".join(CARDS)}
-Available categories: {", ".join(CATEGORIES)}
+Available cards (match case-insensitively): {cards_str}
+Available categories: {cats_str}
 
 Card matching — the user will often write abbreviated/lowercase card names, match them:
 - "hsbc revo" or "hsbc" → HSBC REVO
@@ -327,7 +340,7 @@ Qualifying charge:
 Other rules:
 - If no card mentioned → default to "Cash"
 - Infer category from description (grab/uber = Transport, food/coffee/restaurant = Food, shopee/taobao = Shopping, etc.)
-- Dates: if not mentioned, use today ({date.today().isoformat()})
+- Dates: if not mentioned, use today ({today}). Today is {today} (Singapore time).
 
 Respond ONLY with a JSON object, no other text:
 {{
@@ -348,7 +361,7 @@ If you cannot parse an expense at all, return: {{"error": "not an expense"}}
 def parse_expense_with_claude(text):
     resp = client.messages.create(
         model="claude-sonnet-4-20250514", max_tokens=400,
-        system=PARSE_SYSTEM, messages=[{"role":"user","content":text}]
+        system=build_parse_system(), messages=[{"role":"user","content":text}]
     )
     raw = resp.content[0].text.strip()
     # Strip markdown fences
@@ -488,7 +501,7 @@ def logout():
 @flask_app.route("/")
 def dashboard():
     if require_auth(): return redirect("/login")
-    now=datetime.now()
+    now=now_sgt()
     y=int(request.args.get("y",now.year)); m=int(request.args.get("m",now.month))
     label=datetime(y,m,1).strftime("%B %Y")
     pv,pm=(y-1,12) if m==1 else (y,m-1)
@@ -612,7 +625,7 @@ def add_entry():
                 flash=f'<div class="flash flash-ok">✅ Saved #{tid} — {desc} ${tot:.2f}</div>'
         except Exception as e:
             flash=f'<div class="flash flash-err">Error: {e}</div>'
-    today=date.today().isoformat()
+    today=today_sgt().isoformat()
     copts="".join(f"<option>{c}</option>" for c in CATEGORIES)
     kopts="".join(f"<option>{c}</option>" for c in CARDS)
     content=f"""<div style="max-width:560px;margin:0 auto"><div class="card">
@@ -656,9 +669,9 @@ def edit_entry(tid):
 def history():
     if require_auth(): return redirect("/login")
     months=get_available_months()
-    sel=request.args.get("ym", months[0] if months else datetime.now().strftime("%Y-%m"))
+    sel=request.args.get("ym", months[0] if months else now_sgt().strftime("%Y-%m"))
     try: y,m=int(sel[:4]),int(sel[5:])
-    except: y,m=datetime.now().year,datetime.now().month
+    except: y,m=now_sgt().year,now_sgt().month
     label=datetime(y,m,1).strftime("%B %Y")
     txns=fetch_transactions(year=y,month=m)
     mopts="".join(
@@ -734,7 +747,7 @@ def sales_page():
       </div>
       <form method="post" action="/sales/add" style="margin-bottom:16px">
         <div class="row">
-          <div class="field"><label>Date</label><input type="date" name="date" value="{date.today().isoformat()}"></div>
+          <div class="field"><label>Date</label><input type="date" name="date" value="{today_sgt().isoformat()}"></div>
           <div class="field"><label>Item</label><input name="desc" placeholder="Item sold"></div>
           <div class="field"><label>Revenue</label><input type="number" name="revenue" placeholder="0.00" step="0.01" min="0"></div>
           <div class="field"><label>Cost</label><input type="number" name="cost" placeholder="0.00" step="0.01" min="0"></div>
@@ -864,7 +877,7 @@ async def cmd_help(update, ctx): await cmd_start(update, ctx)
 
 async def cmd_recent(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update): return await reject(update)
-    today = date.today().isoformat()
+    today = today_sgt().isoformat()
     conn = get_conn()
     cur = conn.execute(
         "SELECT * FROM transactions WHERE date<=? ORDER BY date DESC, id DESC LIMIT 10",
@@ -882,8 +895,8 @@ async def cmd_recent(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_summary(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update): return await reject(update)
-    now = datetime.now()
-    today = date.today().isoformat()
+    now = now_sgt()
+    today = today_sgt().isoformat()
     ym = f"{now.year:04d}-{now.month:02d}"
     conn = get_conn()
     cur = conn.execute(
@@ -913,8 +926,8 @@ async def cmd_summary(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def cmd_miles(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update): return await reject(update)
     import calendar as cal
-    now = datetime.now()
-    today = date.today().isoformat()
+    now = now_sgt()
+    today = today_sgt().isoformat()
     def card_window(card_id):
         if card_id == "CITI REWARDS":
             if now.day >= 6:
@@ -943,19 +956,91 @@ async def cmd_miles(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if spent == 0 and cap is not None:
             continue
         emoji = CARD_EMOJI.get(card, "💳")
-        if cap is None:
-            miles = round(spent * mpd)
+        # Compute miles using correct per-card formula
+        if card == "UOB PRIVI":
+            miles = round(spent * 1.4)
             cap_line = "No cap"
             status = "🟢"
             bar = "∞"
-        else:
+        elif card in ("CITI REWARDS",):
+            # base = sum of floor(amt) per txn, bonus = min(9000, base*9), miles = (base+bonus)*0.4
+            conn2 = get_conn()
+            cur2 = conn2.execute(
+                "SELECT SUM(CAST(total AS INTEGER)) FROM transactions"
+                " WHERE card=? AND date>=? AND date<=? AND type='expense' AND qualifying='Yes'",
+                (card, start, end))
+            base_pts = cur2.fetchone()[0] or 0
+            conn2.close()
+            bonus = min(9000, base_pts * 9)
+            miles = round((base_pts + bonus) * 0.4)
             pct = min(spent/cap, 1.0)
             filled = int(pct*10)
             bar = "█"*filled + "░"*(10-filled)
             rem = max(0, cap-spent)
             status = "🔴" if spent>=cap else ("🟡" if pct>=0.8 else "🟢")
             cap_line = f"CAP REACHED (${spent:.0f}/${cap:.0f})" if spent>=cap else f"${rem:.0f} to cap"
-            miles = round(min(spent,cap)*mpd*mult)
+        elif card == "HSBC REVO":
+            # base = sum of round(amt) per txn, bonus = min(9000, capped_spend*9), miles = (base+bonus)*0.4
+            conn2 = get_conn()
+            cur2 = conn2.execute(
+                "SELECT SUM(ROUND(total)) FROM transactions"
+                " WHERE card=? AND date>=? AND date<=? AND type='expense' AND qualifying='Yes'",
+                (card, start, end))
+            base_pts = cur2.fetchone()[0] or 0
+            conn2.close()
+            capped_spend = min(spent, cap)
+            bonus = min(9000, int(capped_spend * 9))
+            miles = round((base_pts + bonus) * 0.4)
+            pct = min(spent/cap, 1.0)
+            filled = int(pct*10)
+            bar = "█"*filled + "░"*(10-filled)
+            rem = max(0, cap-spent)
+            status = "🔴" if spent>=cap else ("🟡" if pct>=0.8 else "🟢")
+            cap_line = f"CAP REACHED (${spent:.0f}/${cap:.0f})" if spent>=cap else f"${rem:.0f} to cap"
+        elif card in ("UOB PPV Contactless","UOB PPV Online","UOB VS SGD","UOB VS FCY","DBS WWMC"):
+            # base = sum of floor(amt/5) per txn
+            conn2 = get_conn()
+            cur2 = conn2.execute(
+                "SELECT SUM(CAST(total/5 AS INTEGER)) FROM transactions"
+                " WHERE card=? AND date>=? AND date<=? AND type='expense' AND qualifying='Yes'",
+                (card, start, end))
+            base_pts = cur2.fetchone()[0] or 0
+            conn2.close()
+            if card == "DBS WWMC":
+                bonus = base_pts * 9  # no bonus cap
+            elif card in ("UOB VS SGD","UOB VS FCY"):
+                bonus = min(4000, base_pts * 9) if spent >= 1000 else 0
+            else:  # UOB PPV
+                bonus = min(2000, base_pts * 9)
+            miles = round((base_pts + bonus) * 2)
+            pct = min(spent/cap, 1.0)
+            filled = int(pct*10)
+            bar = "█"*filled + "░"*(10-filled)
+            rem = max(0, cap-spent)
+            status = "🔴" if spent>=cap else ("🟡" if pct>=0.8 else "🟢")
+            cap_line = f"CAP REACHED (${spent:.0f}/${cap:.0f})" if spent>=cap else f"${rem:.0f} to cap"
+        elif card == "OCBC REWARDS":
+            # base = sum of floor(amt/5), bonus = base*45, miles = total*0.4
+            conn2 = get_conn()
+            cur2 = conn2.execute(
+                "SELECT SUM(CAST(total/5 AS INTEGER)) FROM transactions"
+                " WHERE card=? AND date>=? AND date<=? AND type='expense' AND qualifying='Yes'",
+                (card, start, end))
+            base_pts = cur2.fetchone()[0] or 0
+            conn2.close()
+            bonus = base_pts * 45
+            miles = round((base_pts + bonus) * 0.4)
+            pct = min(spent/cap, 1.0)
+            filled = int(pct*10)
+            bar = "█"*filled + "░"*(10-filled)
+            rem = max(0, cap-spent)
+            status = "🔴" if spent>=cap else ("🟡" if pct>=0.8 else "🟢")
+            cap_line = f"CAP REACHED (${spent:.0f}/${cap:.0f})" if spent>=cap else f"${rem:.0f} to cap"
+        else:
+            miles = 0
+            cap_line = ""
+            status = "🟢"
+            bar = "∞"
         total_miles += miles
         lines.append(f"{status} {emoji} {card}\n  [{bar}] ${spent:.0f} ({label})\n  {cap_line} | ~{miles:,} miles")
     conn.close()
