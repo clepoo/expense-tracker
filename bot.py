@@ -1378,6 +1378,49 @@ async def cmd_edit(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         await update.message.reply_text("❌ ID must be a number. Example: /edit 42 total 8.50")
 
+async def cmd_sell(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not is_allowed(update): return await reject(update)
+    args = ctx.args
+    # Usage: /sell <revenue> <description> [cost <amount>]
+    # e.g. /sell 70 VP9 Flowerpot Lamp cost 41.60
+    # e.g. /sell 80 Cartier earrings
+    if not args or len(args) < 2:
+        return await update.message.reply_text(
+            "Usage: /sell <revenue> <description> [cost <amount>]\n\n"
+            "Examples:\n"
+            "/sell 70 VP9 Flowerpot Lamp cost 41.60\n"
+            "/sell 80 Cartier earrings\n"
+            "/sell 252 Lemaire Croissant Bag cost 4.30"
+        )
+        return
+    try:
+        revenue = float(args[0])
+    except ValueError:
+        return await update.message.reply_text("❌ First argument must be the sale price. Example: /sell 70 VP9 Lamp cost 41.60")
+    # Find "cost" keyword and split description from cost
+    rest = args[1:]
+    cost = 0.0
+    if "cost" in [a.lower() for a in rest]:
+        cost_idx = [a.lower() for a in rest].index("cost")
+        desc = " ".join(rest[:cost_idx]).strip()
+        try:
+            cost = float(rest[cost_idx + 1])
+        except (IndexError, ValueError):
+            return await update.message.reply_text("❌ Invalid cost. Example: /sell 70 VP9 Lamp cost 41.60")
+    else:
+        desc = " ".join(rest).strip()
+    if not desc:
+        return await update.message.reply_text("❌ Please include a description. Example: /sell 70 VP9 Lamp")
+    profit = round(revenue - cost, 2)
+    insert_sale(today_sgt().isoformat(), desc, revenue, cost)
+    await update.message.reply_text(
+        f"✅ Sale recorded\n\n"
+        f"🏷️ {desc}\n"
+        f"  Revenue: ${revenue:.2f}"
+        + (f" | Cost: ${cost:.2f}" if cost > 0 else "")
+        + f" | Profit: ${profit:.2f}"
+    )
+
 async def cmd_delete(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update): return await reject(update)
     if not ctx.args or not ctx.args[0].isdigit():
@@ -1518,6 +1561,7 @@ def main():
     tg.add_handler(CommandHandler("miles",     cmd_miles))
     tg.add_handler(CommandHandler("recurring", cmd_recurring))
     tg.add_handler(CommandHandler("edit",      cmd_edit))
+    tg.add_handler(CommandHandler("sell",      cmd_sell))
     tg.add_handler(CommandHandler("delete",    cmd_delete))
     tg.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     log.info("Telegram bot polling…")
