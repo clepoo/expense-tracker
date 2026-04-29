@@ -126,7 +126,8 @@ def init_db():
             profit REAL NOT NULL DEFAULT 0, created_at TEXT NOT NULL)""",
         """CREATE TABLE IF NOT EXISTS recurring (
             id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
-            amount REAL NOT NULL, category TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1)""",
+            amount REAL NOT NULL, category TEXT NOT NULL,
+            card TEXT NOT NULL DEFAULT 'Cash', active INTEGER NOT NULL DEFAULT 1)""",
         """CREATE TABLE IF NOT EXISTS logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT, category TEXT NOT NULL,
             date TEXT NOT NULL, desc TEXT NOT NULL, amount REAL NOT NULL DEFAULT 0,
@@ -134,6 +135,12 @@ def init_db():
         """CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, data TEXT NOT NULL)""",
     ]:
         conn.execute(stmt)
+    # Add card column to recurring if it doesn't exist (migration)
+    try:
+        conn.execute("ALTER TABLE recurring ADD COLUMN card TEXT NOT NULL DEFAULT 'Cash'")
+        db_commit(conn)
+    except Exception:
+        pass  # Column already exists
     db_commit(conn)
     conn.close()
 
@@ -266,9 +273,9 @@ def toggle_recurring(rid, active):
     conn.execute("UPDATE recurring SET active=? WHERE id=?", (1 if active else 0, rid))
     db_commit(conn); conn.close()
 
-def add_recurring(name, amount, category):
+def add_recurring(name, amount, category, card="Cash"):
     conn = get_conn()
-    conn.execute("INSERT INTO recurring (name,amount,category,active) VALUES (?,?,?,1)", (name, round(float(amount),2), category))
+    conn.execute("INSERT INTO recurring (name,amount,category,card,active) VALUES (?,?,?,?,1)", (name, round(float(amount),2), category, card))
     db_commit(conn); conn.close()
 
 def delete_recurring(rid):
@@ -303,7 +310,32 @@ def delete_sale(sid):
     return True
 
 
+# ── SETTINGS DB ──────────────────────────────────────────────────
+def get_salary():
+    conn = get_conn()
+    try:
+        conn.execute("CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, data TEXT NOT NULL)")
+        cur = conn.execute("SELECT data FROM kv_store WHERE key='salary'")
+        row = cur.fetchone()
+        conn.close()
+        return float(row[0]) if row else 6050.0
+    except:
+        conn.close()
+        return 6050.0
+
+def set_salary(amount):
+    conn = get_conn()
+    try:
+        conn.execute("CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, data TEXT NOT NULL)")
+        conn.execute("INSERT OR REPLACE INTO kv_store (key, data) VALUES ('salary', ?)", (str(round(float(amount), 2)),))
+        db_commit(conn)
+    except Exception as e:
+        log.error(f"set_salary: {e}")
+    finally:
+        conn.close()
+
 # ── SKIN PACKAGE DB ───────────────────────────────────────────────
+
 def get_become_package():
     """Load from storage or return defaults."""
     conn = get_conn()
@@ -600,7 +632,7 @@ def dashboard():
     txns=fetch_transactions(year=y,month=m,limit=20,typ="expense")
     rec=get_recurring()
     rec_total=sum(r["amount"] for r in rec)
-    SALARY=6050
+    SALARY=get_salary()
     bal=SALARY-total_exp-rec_total
     bc="var(--green)" if bal>=0 else "var(--red)"
 
@@ -869,23 +901,39 @@ def recurring_page():
     total=sum(r["amount"] for r in rec)
     flash_html=f'<div class="flash flash-ok">{flash}</div>' if flash else ""
     copts="".join(f"<option>{c}</option>" for c in CATEGORIES)
-    rows="".join(
-        f'<div class="rec-row">'
-        f'<div class="eicon">{CAT_EMOJI.get(r["category"],"📌")}</div>'
-        f'<div class="rec-info"><div class="rec-name">{r["name"]}</div><div class="rec-cat">{r["category"]}</div></div>'
-        f'<form method="post" action="/recurring/update/{r["id"]}" style="display:flex;align-items:center;gap:8px;margin:0">'
-        f'<input type="number" name="amount" value="{r["amount"]}" step="0.01" style="width:90px;padding:5px 8px;font-size:13px">'
-        f'<button class="btn-sm btn-save">Save</button>'
-        f'</form>'
-        f'<form method="post" action="/recurring/delete/{r["id"]}" style="margin:0">'
-        f'<button class="btn-sm btn-del">✕</button></form></div>'
-        for r in rec
-    ) if rec else '<div class="empty">No recurring items</div>'
+    def rec_row(r):
+        kopts = "".join(f'<option {"selected" if c==r.get("card","Cash") else ""}>{c}</option>' for c in CARDS)
+        card_emoji = CARD_EMOJI.get(r.get("card","Cash"), "💳")
+        return (
+            f'<div class="rec-row">'
+            f'<div class="eicon">{CAT_EMOJI.get(r["category"],"📌")}</div>'
+            f'<div class="rec-info"><div class="rec-name">{r["name"]}</div>'
+            f'<div class="rec-cat">{r["category"]} · {card_emoji} {r.get("card","Cash")}</div></div>'
+            f'<form method="post" action="/recurring/update/{r["id"]}" style="display:flex;align-items:center;gap:8px;margin:0">'
+            f'<input type="number" name="amount" value="{r["amount"]}" step="0.01" style="width:80px;padding:5px 8px;font-size:12px">'
+            f'<select name="card" style="padding:5px 8px;font-size:12px;width:130px">{kopts}</select>'
+            f'<button class="btn-sm btn-save">Save</button>'
+            f'</form>'
+            f'<form method="post" action="/recurring/delete/{r["id"]}" style="margin:0">'
+            f'<button class="btn-sm btn-del">✕</button></form></div>'
+        )
+    rows = "".join(rec_row(r) for r in rec) if rec else '<div class="empty">No recurring items</div>'
 
     content=f"""
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <h2 style="font-family:var(--serif);font-size:1.3rem;font-weight:400">Recurring Expenses</h2>
       <div style="font-family:var(--serif);font-size:1.1rem;color:var(--amber)">Total: ${total:,.2f}/mo</div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-size:13px;font-weight:500;min-width:120px">Monthly Salary</div>
+        <form method="post" action="/settings/salary" style="display:flex;align-items:center;gap:8px;margin:0;flex:1">
+          <input type="number" name="salary" value="{get_salary():.2f}" step="0.01" min="0"
+            style="width:130px;padding:7px 10px;font-size:13px">
+          <button class="btn-sm btn-save" type="submit">Update</button>
+        </form>
+        <div style="font-size:12px;color:var(--muted)">Used for balance calculation</div>
+      </div>
     </div>
     {flash_html}
     <div class="card">
@@ -898,17 +946,33 @@ def recurring_page():
         <div class="row">
           <div class="field"><label>Name</label><input name="name" placeholder="e.g. Netflix, Gym"></div>
           <div class="field"><label>Amount</label><input type="number" name="amount" placeholder="0.00" step="0.01" min="0"></div>
+        </div>
+        <div class="row">
           <div class="field"><label>Category</label><select name="category">{copts}</select></div>
+          <div class="field"><label>Card</label><select name="card">{"".join(f'<option>{c}</option>' for c in CARDS)}</select></div>
         </div>
         <button class="btn btn-primary">Add recurring item</button>
       </form>
     </div>"""
     return render(content,"recurring")
 
+@flask_app.route("/settings/salary", methods=["POST"])
+def settings_salary():
+    if require_auth(): return redirect("/login")
+    try:
+        set_salary(float(request.form["salary"]))
+    except Exception as e:
+        log.error(f"salary update: {e}")
+    return redirect("/recurring?flash=Salary+updated")
+
 @flask_app.route("/recurring/update/<int:rid>", methods=["POST"])
 def recurring_update(rid):
     if require_auth(): return redirect("/login")
-    try: update_recurring(rid, request.form["amount"])
+    try:
+        conn = get_conn()
+        conn.execute("UPDATE recurring SET amount=?, card=? WHERE id=?",
+                     (round(float(request.form["amount"]),2), request.form.get("card","Cash"), rid))
+        db_commit(conn); conn.close()
     except Exception as e: log.error(f"Recurring update error: {e}")
     return redirect("/recurring?flash=Updated+successfully")
 
@@ -916,7 +980,8 @@ def recurring_update(rid):
 def recurring_add():
     if require_auth(): return redirect("/login")
     try:
-        add_recurring(request.form["name"], float(request.form["amount"]), request.form["category"])
+        add_recurring(request.form["name"], float(request.form["amount"]),
+                      request.form["category"], request.form.get("card","Cash"))
     except Exception as e: log.error(f"Recurring add error: {e}")
     return redirect("/recurring?flash=Added+successfully")
 
@@ -1185,7 +1250,7 @@ async def cmd_summary(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     count = (r3[0] or 0)
     rec = get_recurring()
     rec_total = sum(r["amount"] for r in rec)
-    bal = 6050 - total_exp - rec_total
+    bal = get_salary() - total_exp - rec_total
     lines = [f"📊 {now.strftime('%B %Y')} — {count} transactions\n"]
     for r in cats:
         bar_len = int((r["total"]/total_exp)*12) if total_exp else 0
