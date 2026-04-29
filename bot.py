@@ -136,11 +136,15 @@ def init_db():
     ]:
         conn.execute(stmt)
     # Add card column to recurring if it doesn't exist (migration)
-    try:
-        conn.execute("ALTER TABLE recurring ADD COLUMN card TEXT NOT NULL DEFAULT 'Cash'")
-        db_commit(conn)
-    except Exception:
-        pass  # Column already exists
+    for migration in [
+        "ALTER TABLE recurring ADD COLUMN card TEXT NOT NULL DEFAULT 'Cash'",
+        "ALTER TABLE recurring ADD COLUMN qualifying TEXT NOT NULL DEFAULT 'Yes'",
+    ]:
+        try:
+            conn.execute(migration)
+            db_commit(conn)
+        except Exception:
+            pass  # Column already exists
     db_commit(conn)
     conn.close()
 
@@ -273,9 +277,9 @@ def toggle_recurring(rid, active):
     conn.execute("UPDATE recurring SET active=? WHERE id=?", (1 if active else 0, rid))
     db_commit(conn); conn.close()
 
-def add_recurring(name, amount, category, card="Cash"):
+def add_recurring(name, amount, category, card="Cash", qualifying="Yes"):
     conn = get_conn()
-    conn.execute("INSERT INTO recurring (name,amount,category,card,active) VALUES (?,?,?,?,1)", (name, round(float(amount),2), category, card))
+    conn.execute("INSERT INTO recurring (name,amount,category,card,qualifying,active) VALUES (?,?,?,?,?,1)", (name, round(float(amount),2), category, card, qualifying))
     db_commit(conn); conn.close()
 
 def delete_recurring(rid):
@@ -908,15 +912,22 @@ def recurring_page():
     copts="".join(f"<option>{c}</option>" for c in CATEGORIES)
     def rec_row(r):
         kopts = "".join(f'<option {"selected" if c==r.get("card","Cash") else ""}>{c}</option>' for c in CARDS)
+        qopts = (f'<option {"selected" if r.get("qualifying","Yes")=="Yes" else ""}>Yes</option>'
+                 f'<option {"selected" if r.get("qualifying","Yes")=="No" else ""}>No</option>')
         card_emoji = CARD_EMOJI.get(r.get("card","Cash"), "💳")
+        qual = r.get("qualifying","Yes")
+        qual_badge = (f'<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:var(--green-dim);color:var(--green)">Q</span>'
+                      if qual=="Yes" else
+                      f'<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:var(--surface3);color:var(--muted)">NQ</span>')
         return (
             f'<div class="rec-row">'
             f'<div class="eicon">{CAT_EMOJI.get(r["category"],"📌")}</div>'
-            f'<div class="rec-info"><div class="rec-name">{r["name"]}</div>'
+            f'<div class="rec-info"><div class="rec-name">{r["name"]} {qual_badge}</div>'
             f'<div class="rec-cat">{r["category"]} · {card_emoji} {r.get("card","Cash")}</div></div>'
-            f'<form method="post" action="/recurring/update/{r["id"]}" style="display:flex;align-items:center;gap:8px;margin:0">'
+            f'<form method="post" action="/recurring/update/{r["id"]}" style="display:flex;align-items:center;gap:6px;margin:0;flex-wrap:wrap">'
             f'<input type="number" name="amount" value="{r["amount"]}" step="0.01" style="width:80px;padding:5px 8px;font-size:12px">'
-            f'<select name="card" style="padding:5px 8px;font-size:12px;width:130px">{kopts}</select>'
+            f'<select name="card" style="padding:5px 8px;font-size:12px;width:120px">{kopts}</select>'
+            f'<select name="qualifying" style="padding:5px 8px;font-size:12px;width:65px">{qopts}</select>'
             f'<button class="btn-sm btn-save">Save</button>'
             f'</form>'
             f'<form method="post" action="/recurring/delete/{r["id"]}" style="margin:0">'
@@ -945,6 +956,19 @@ def recurring_page():
       <div class="card-title">Monthly items</div>
       {rows}
     </div>
+    <div class="card" style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="card-title" style="margin:0">Post to month</div>
+        <div style="font-size:12px;color:var(--muted)">Creates real transactions for the selected month</div>
+      </div>
+      <form method="post" action="/recurring/post" style="display:flex;align-items:center;gap:10px">
+        <select name="ym" style="padding:7px 10px;font-size:13px;width:160px">
+          {"".join(f'<option value="{m}">{datetime(int(m[:4]),int(m[5:]),1).strftime("%B %Y")}</option>' for m in get_available_months()) if get_available_months() else f'<option value="{now_sgt().strftime("%Y-%m")}">{now_sgt().strftime("%B %Y")}</option>'}
+        </select>
+        <button class="btn btn-primary" type="submit">Post recurring expenses</button>
+      </form>
+      <div style="font-size:11px;color:var(--hint);margin-top:8px">⚠️ Only posts items not already posted this month (checks for duplicate names).</div>
+    </div>
     <div class="card">
       <div class="card-title">Add new recurring item</div>
       <form method="post" action="/recurring/add">
@@ -955,6 +979,7 @@ def recurring_page():
         <div class="row">
           <div class="field"><label>Category</label><select name="category">{copts}</select></div>
           <div class="field"><label>Card</label><select name="card">{"".join(f'<option>{c}</option>' for c in CARDS)}</select></div>
+          <div class="field"><label>Qualifying</label><select name="qualifying"><option>Yes</option><option>No</option></select></div>
         </div>
         <button class="btn btn-primary">Add recurring item</button>
       </form>
@@ -975,8 +1000,9 @@ def recurring_update(rid):
     if require_auth(): return redirect("/login")
     try:
         conn = get_conn()
-        conn.execute("UPDATE recurring SET amount=?, card=? WHERE id=?",
-                     (round(float(request.form["amount"]),2), request.form.get("card","Cash"), rid))
+        conn.execute("UPDATE recurring SET amount=?, card=?, qualifying=? WHERE id=?",
+                     (round(float(request.form["amount"]),2), request.form.get("card","Cash"),
+                      request.form.get("qualifying","Yes"), rid))
         db_commit(conn); conn.close()
     except Exception as e: log.error(f"Recurring update error: {e}")
     return redirect("/recurring?flash=Updated+successfully")
@@ -986,9 +1012,47 @@ def recurring_add():
     if require_auth(): return redirect("/login")
     try:
         add_recurring(request.form["name"], float(request.form["amount"]),
-                      request.form["category"], request.form.get("card","Cash"))
+                      request.form["category"], request.form.get("card","Cash"),
+                      request.form.get("qualifying","Yes"))
     except Exception as e: log.error(f"Recurring add error: {e}")
     return redirect("/recurring?flash=Added+successfully")
+
+@flask_app.route("/recurring/post", methods=["POST"])
+def recurring_post():
+    if require_auth(): return redirect("/login")
+    ym = request.form.get("ym", now_sgt().strftime("%Y-%m"))
+    try:
+        y, m = int(ym[:4]), int(ym[5:])
+        import calendar as _cal
+        last_day = _cal.monthrange(y, m)[1]
+        post_date = f"{y:04d}-{m:02d}-{last_day:02d}"  # post on last day of month
+        rec = get_recurring()
+        # Check which ones are already posted this month to avoid duplicates
+        conn = get_conn()
+        cur = conn.execute(
+            "SELECT desc FROM transactions WHERE strftime('%Y-%m',date)=? AND type='expense'",
+            (ym,)
+        )
+        existing_descs = {row[0].lower() for row in cur.fetchall()}
+        conn.close()
+        posted = 0
+        skipped = 0
+        for r in rec:
+            if r["name"].lower() in existing_descs:
+                skipped += 1
+                continue
+            insert_transaction(
+                post_date, r["name"], r["category"],
+                r["amount"], r["amount"],
+                r.get("card","Cash"), r.get("qualifying","Yes")
+            )
+            posted += 1
+        msg = f"Posted+{posted}+items+to+{ym}"
+        if skipped: msg += f"+({skipped}+skipped+-+already+exist)"
+        return redirect(f"/recurring?flash={msg}")
+    except Exception as e:
+        log.error(f"recurring_post error: {e}")
+        return redirect("/recurring?flash=Error+posting+recurring")
 
 @flask_app.route("/recurring/delete/<int:rid>", methods=["POST"])
 def recurring_delete(rid):
