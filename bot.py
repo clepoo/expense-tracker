@@ -633,11 +633,16 @@ def dashboard():
     rec=get_recurring()
     rec_total=sum(r["amount"] for r in rec)
     SALARY=get_salary()
-    bal=SALARY-total_exp-rec_total
+    # Add sales revenue for the viewed month
+    month_sales=get_sales(year=y,month=m)
+    sales_income=sum(s["revenue"] for s in month_sales)
+    total_income=SALARY+sales_income
+    bal=total_income-total_exp-rec_total
     bc="var(--green)" if bal>=0 else "var(--red)"
+    income_sub=f'+${sales_income:,.2f} sales' if sales_income>0 else "Salary only"
 
     stats=f"""<div class="grid4" style="margin-bottom:16px">
-      <div class="stat"><div class="stat-label">Income</div><div class="stat-value" style="color:var(--green)">${SALARY:,.2f}</div></div>
+      <div class="stat"><div class="stat-label">Income</div><div class="stat-value" style="color:var(--green)">${total_income:,.2f}</div><div class="stat-sub">{income_sub}</div></div>
       <div class="stat"><div class="stat-label">Variable expenses</div><div class="stat-value" style="color:var(--red)">${total_exp:,.2f}</div><div class="stat-sub">{count} transactions</div></div>
       <div class="stat"><div class="stat-label">Recurring</div><div class="stat-value" style="color:var(--amber)">${rec_total:,.2f}</div></div>
       <div class="stat"><div class="stat-label">Balance</div><div class="stat-value" style="color:{bc}">${abs(bal):,.2f}</div><div class="stat-sub">{"surplus" if bal>=0 else "deficit"}</div></div>
@@ -1250,15 +1255,21 @@ async def cmd_summary(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     count = (r3[0] or 0)
     rec = get_recurring()
     rec_total = sum(r["amount"] for r in rec)
-    bal = get_salary() - total_exp - rec_total
+    month_sales = get_sales(year=now.year, month=now.month)
+    sales_income = sum(s["revenue"] for s in month_sales)
+    total_income = get_salary() + sales_income
+    bal = total_income - total_exp - rec_total
     lines = [f"📊 {now.strftime('%B %Y')} — {count} transactions\n"]
     for r in cats:
         bar_len = int((r["total"]/total_exp)*12) if total_exp else 0
         bar = "█"*bar_len + "░"*(12-bar_len)
         lines.append(f"{CAT_EMOJI.get(r['category'],'📌')} {r['category']}\n[{bar}] ${r['total']:.2f}")
-    lines.append(f"\n💸 Variable: ${total_exp:.2f}")
+    lines.append(f"\n💰 Salary: ${get_salary():.2f}")
+    if sales_income > 0:
+        lines.append(f"🏷️ Sales: ${sales_income:.2f}")
+    lines.append(f"💸 Variable: ${total_exp:.2f}")
     lines.append(f"🔁 Recurring: ${rec_total:.2f}")
-    lines.append(f"💰 Balance: ${bal:.2f} ({'surplus' if bal>=0 else 'deficit'})")
+    lines.append(f"✅ Balance: ${bal:.2f} ({'surplus' if bal>=0 else 'deficit'})")
     await update.message.reply_text("\n\n".join(lines))
 
 async def cmd_miles(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
