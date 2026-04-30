@@ -635,20 +635,19 @@ def dashboard():
     cats,total_exp,count,card_spend=get_monthly_summary(y,m)
     txns=fetch_transactions(year=y,month=m,limit=20,typ="expense")
     rec=get_recurring()
-    rec_total=sum(r["amount"] for r in rec)
     SALARY=get_salary()
     # Add sales revenue for the viewed month
     month_sales=get_sales(year=y,month=m)
     sales_income=sum(s["revenue"] for s in month_sales)
     total_income=SALARY+sales_income
-    bal=total_income-total_exp-rec_total
+    # Balance = income - all expenses (recurring already included as posted transactions)
+    bal=total_income-total_exp
     bc="var(--green)" if bal>=0 else "var(--red)"
     income_sub=f'+${sales_income:,.2f} sales' if sales_income>0 else "Salary only"
 
-    stats=f"""<div class="grid4" style="margin-bottom:16px">
+    stats=f"""<div class="grid3" style="margin-bottom:16px">
       <div class="stat"><div class="stat-label">Income</div><div class="stat-value" style="color:var(--green)">${total_income:,.2f}</div><div class="stat-sub">{income_sub}</div></div>
-      <div class="stat"><div class="stat-label">Variable expenses</div><div class="stat-value" style="color:var(--red)">${total_exp:,.2f}</div><div class="stat-sub">{count} transactions</div></div>
-      <div class="stat"><div class="stat-label">Recurring</div><div class="stat-value" style="color:var(--amber)">${rec_total:,.2f}</div></div>
+      <div class="stat"><div class="stat-label">Total expenses</div><div class="stat-value" style="color:var(--red)">${total_exp:,.2f}</div><div class="stat-sub">{count} transactions (incl. recurring)</div></div>
       <div class="stat"><div class="stat-label">Balance</div><div class="stat-value" style="color:{bc}">${abs(bal):,.2f}</div><div class="stat-sub">{"surplus" if bal>=0 else "deficit"}</div></div>
     </div>"""
 
@@ -1318,11 +1317,11 @@ async def cmd_summary(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     total_exp = (r2[0] or 0)
     count = (r3[0] or 0)
     rec = get_recurring()
-    rec_total = sum(r["amount"] for r in rec)
     month_sales = get_sales(year=now.year, month=now.month)
     sales_income = sum(s["revenue"] for s in month_sales)
     total_income = get_salary() + sales_income
-    bal = total_income - total_exp - rec_total
+    # Balance uses total_exp only — recurring already posted as transactions
+    bal = total_income - total_exp
     lines = [f"📊 {now.strftime('%B %Y')} — {count} transactions\n"]
     for r in cats:
         bar_len = int((r["total"]/total_exp)*12) if total_exp else 0
@@ -1331,8 +1330,7 @@ async def cmd_summary(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     lines.append(f"\n💰 Salary: ${get_salary():.2f}")
     if sales_income > 0:
         lines.append(f"🏷️ Sales: ${sales_income:.2f}")
-    lines.append(f"💸 Variable: ${total_exp:.2f}")
-    lines.append(f"🔁 Recurring: ${rec_total:.2f}")
+    lines.append(f"💸 Total expenses: ${total_exp:.2f} (incl. recurring)")
     lines.append(f"✅ Balance: ${bal:.2f} ({'surplus' if bal>=0 else 'deficit'})")
     await update.message.reply_text("\n\n".join(lines))
 
