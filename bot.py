@@ -315,10 +315,19 @@ def delete_sale(sid):
 
 
 # ── SETTINGS DB ──────────────────────────────────────────────────
-def get_salary():
+def get_salary(ym=None):
+    """Get salary for a specific month (ym="2026-04"), falling back to global default."""
     conn = get_conn()
     try:
         conn.execute("CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, data TEXT NOT NULL)")
+        # Try month-specific first
+        if ym:
+            cur = conn.execute("SELECT data FROM kv_store WHERE key=?", (f"salary_{ym}",))
+            row = cur.fetchone()
+            if row:
+                conn.close()
+                return float(row[0])
+        # Fall back to global default
         cur = conn.execute("SELECT data FROM kv_store WHERE key='salary'")
         row = cur.fetchone()
         conn.close()
@@ -327,11 +336,13 @@ def get_salary():
         conn.close()
         return 6050.0
 
-def set_salary(amount):
+def set_salary(amount, ym=None):
+    """Set salary for a specific month, or global default if ym is None."""
+    key = f"salary_{ym}" if ym else "salary"
     conn = get_conn()
     try:
         conn.execute("CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, data TEXT NOT NULL)")
-        conn.execute("INSERT OR REPLACE INTO kv_store (key, data) VALUES ('salary', ?)", (str(round(float(amount), 2)),))
+        conn.execute("INSERT OR REPLACE INTO kv_store (key, data) VALUES (?, ?)", (key, str(round(float(amount), 2))))
         db_commit(conn)
     except Exception as e:
         log.error(f"set_salary: {e}")
@@ -635,14 +646,14 @@ def dashboard():
     cats,total_exp,count,card_spend=get_monthly_summary(y,m)
     txns=fetch_transactions(year=y,month=m,limit=20,typ="expense")
     rec=get_recurring()
-    SALARY=get_salary()
+    ym=f"{y:04d}-{m:02d}"
+    SALARY=get_salary(ym=ym)
     # Add sales revenue for the viewed month
     month_sales=get_sales(year=y,month=m)
     sales_income=sum(s["revenue"] for s in month_sales)
     total_income=SALARY+sales_income
     # Work out how much of total_exp is recurring (matched by name)
     rec_names={r["name"].lower() for r in rec}
-    ym=f"{y:04d}-{m:02d}"
     conn_r=get_conn()
     cur_r=conn_r.execute(
         "SELECT SUM(my_amt) FROM transactions WHERE strftime('%Y-%m',date)=? AND type='expense'",
@@ -651,12 +662,18 @@ def dashboard():
     # Get recurring portion by matching desc to recurring item names
     all_month_txns=fetch_transactions(year=y,month=m,typ="expense")
     conn_r.close()
+    rec_template_total=sum(r["amount"] for r in rec)
     rec_posted=sum(t["my_amt"] for t in all_month_txns if t["desc"].lower() in rec_names)
     var_exp=total_exp-rec_posted
     bal=total_income-total_exp
     bc="var(--green)" if bal>=0 else "var(--red)"
     income_sub=f'+${sales_income:,.2f} sales' if sales_income>0 else "Salary only"
-    exp_sub=f'${var_exp:,.2f} variable + ${rec_posted:,.2f} recurring' if rec_posted>0 else f'{count} transactions'
+    if rec_posted>0:
+        exp_sub=f'${var_exp:,.2f} variable + ${rec_posted:,.2f} recurring'
+    elif rec_template_total>0:
+        exp_sub=f'${total_exp:,.2f} variable + ${rec_template_total:,.2f} recurring (not yet posted)'
+    else:
+        exp_sub=f'{count} transactions'
 
     stats=f"""<div class="grid3" style="margin-bottom:16px">
       <div class="stat"><div class="stat-label">Income</div><div class="stat-value" style="color:var(--green)">${total_income:,.2f}</div><div class="stat-sub">{income_sub}</div></div>
@@ -955,12 +972,16 @@ def recurring_page():
     <div class="card" style="margin-bottom:14px">
       <div style="display:flex;align-items:center;gap:12px">
         <div style="font-size:13px;font-weight:500;min-width:120px">Monthly Salary</div>
-        <form method="post" action="/settings/salary" style="display:flex;align-items:center;gap:8px;margin:0;flex:1">
+        <form method="post" action="/settings/salary" style="display:flex;align-items:center;gap:8px;margin:0;flex:1;flex-wrap:wrap">
           <input type="number" name="salary" value="{get_salary():.2f}" step="0.01" min="0"
-            style="width:130px;padding:7px 10px;font-size:13px">
+            style="width:120px;padding:7px 10px;font-size:13px" placeholder="Default salary">
+          <select name="ym" style="padding:7px 10px;font-size:13px;width:150px">
+            <option value="">All months (default)</option>
+            {"".join(f'<option value="{mo}">{datetime(int(mo[:4]),int(mo[5:]),1).strftime("%B %Y")}</option>' for mo in get_available_months())}
+          </select>
           <button class="btn-sm btn-save" type="submit">Update</button>
         </form>
-        <div style="font-size:12px;color:var(--muted)">Used for balance calculation</div>
+        <div style="font-size:12px;color:var(--muted)">Pick a specific month to override salary for that month only</div>
       </div>
     </div>
     {flash_html}
@@ -1002,7 +1023,8 @@ def recurring_page():
 def settings_salary():
     if require_auth(): return redirect("/login")
     try:
-        set_salary(float(request.form["salary"]))
+        ym = request.form.get("ym") or None
+        set_salary(float(request.form["salary"]), ym=ym)
     except Exception as e:
         log.error(f"salary update: {e}")
     return redirect("/recurring?flash=Salary+updated")
@@ -1332,7 +1354,7 @@ async def cmd_summary(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     rec = get_recurring()
     month_sales = get_sales(year=now.year, month=now.month)
     sales_income = sum(s["revenue"] for s in month_sales)
-    total_income = get_salary() + sales_income
+    total_income = get_salary(ym=now.strftime("%Y-%m")) + sales_income
     # Balance uses total_exp only — recurring already posted as transactions
     bal = total_income - total_exp
     lines = [f"📊 {now.strftime('%B %Y')} — {count} transactions\n"]
@@ -1344,14 +1366,18 @@ async def cmd_summary(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     rec = get_recurring()
     rec_names = {r["name"].lower() for r in rec}
     all_mo_txns = fetch_transactions(year=now.year, month=now.month, typ="expense")
+    rec_template_total = sum(r["amount"] for r in rec)
     rec_posted = sum(t["my_amt"] for t in all_mo_txns if t["desc"].lower() in rec_names)
     var_exp = total_exp - rec_posted
-    lines.append(f"\n💰 Salary: ${get_salary():.2f}")
+    cur_ym = now.strftime("%Y-%m")
+    lines.append(f"\n💰 Salary: ${get_salary(ym=cur_ym):.2f}")
     if sales_income > 0:
         lines.append(f"🏷️ Sales: ${sales_income:.2f}")
     lines.append(f"💸 Variable: ${var_exp:.2f}")
     if rec_posted > 0:
-        lines.append(f"🔁 Recurring: ${rec_posted:.2f}")
+        lines.append(f"🔁 Recurring (posted): ${rec_posted:.2f}")
+    elif rec_template_total > 0:
+        lines.append(f"🔁 Recurring (not yet posted): ${rec_template_total:.2f}")
     lines.append(f"💰 Total expenses: ${total_exp:.2f}")
     lines.append(f"✅ Balance: ${bal:.2f} ({'surplus' if bal>=0 else 'deficit'})")
     await update.message.reply_text("\n\n".join(lines))
