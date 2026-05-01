@@ -353,29 +353,35 @@ def set_salary(amount, ym=None):
 
 def get_become_package():
     """Load from storage or return defaults."""
-    conn = get_conn()
-    try:
-        cur = conn.execute("SELECT data FROM kv_store WHERE key='become_package'")
-        row = cur.fetchone()
-        conn.close()
-        if row:
-            import json as _json
-            return _json.loads(row[0])
-    except:
-        conn.close()
-    return BECOME_PACKAGE_DEFAULT
+    return kv_get("become_package", BECOME_PACKAGE_DEFAULT)
 
 def save_become_package(data):
+    kv_set("become_package", data)
+
+def kv_set(key, value):
     import json as _json
     conn = get_conn()
     try:
         conn.execute("CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, data TEXT NOT NULL)")
-        conn.execute("INSERT OR REPLACE INTO kv_store (key, data) VALUES ('become_package', ?)", (_json.dumps(data),))
+        conn.execute("INSERT OR REPLACE INTO kv_store (key, data) VALUES (?, ?)", (key, _json.dumps(value)))
         db_commit(conn)
     except Exception as e:
-        log.error(f"save_become_package: {e}")
+        log.error(f"kv_set {key}: {e}")
     finally:
         conn.close()
+
+def kv_get(key, default=None):
+    import json as _json
+    conn = get_conn()
+    try:
+        conn.execute("CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, data TEXT NOT NULL)")
+        cur = conn.execute("SELECT data FROM kv_store WHERE key=?", (key,))
+        row = cur.fetchone()
+        conn.close()
+        return _json.loads(row[0]) if row else default
+    except:
+        conn.close()
+        return default
 
 # ── LOGS DB ───────────────────────────────────────────────────────
 LOG_CATEGORIES = ["Driving","Invisalign","Lasik","Skin Treatments","Other"]
@@ -412,6 +418,13 @@ FIFTY_FREED = {
         {"date": "2025-03-15", "amount": 158.40},
     ]
 }
+
+def get_skin_prices():
+    return kv_get("skin_prices", SKIN_PRICES)
+
+def get_fifty_freed():
+    return kv_get("fifty_freed", FIFTY_FREED)
+
 
 def get_logs(category=None):
     conn = get_conn()
@@ -1187,94 +1200,210 @@ def logs_page():
 @flask_app.route("/skin", methods=["GET","POST"])
 def skin_page():
     if require_auth(): return redirect("/login")
+    flash = ""
 
-    # Handle session use update
-    if request.method == "POST" and request.form.get("action") == "update_package":
-        pkg = get_become_package()
-        for item in pkg:
-            key = f"used_{item['treatment'].replace(' ','_')}"
-            if key in request.form:
-                try:
-                    item["used"] = int(request.form[key])
-                except: pass
-        save_become_package(pkg)
-        return redirect("/skin")
+    if request.method == "POST":
+        action = request.form.get("action","")
+
+        if action == "update_package":
+            pkg = get_become_package()
+            for item in pkg:
+                sk = item["treatment"].replace(" ","_")
+                if f"used_{sk}" in request.form:
+                    try: item["used"] = int(request.form[f"used_{sk}"])
+                    except: pass
+                if f"total_{sk}" in request.form:
+                    try: item["total"] = int(request.form[f"total_{sk}"])
+                    except: pass
+            save_become_package(pkg)
+            flash = "Package updated"
+
+        elif action == "add_treatment":
+            pkg = get_become_package()
+            name = request.form.get("treatment_name","").strip()
+            if name:
+                pkg.append({"treatment": name,
+                            "used": int(request.form.get("treatment_used",0)),
+                            "total": int(request.form.get("treatment_total",0))})
+                save_become_package(pkg)
+                flash = f"{name} added"
+
+        elif action == "del_treatment":
+            pkg = get_become_package()
+            name = request.form.get("treatment_name","")
+            pkg = [p for p in pkg if p["treatment"] != name]
+            save_become_package(pkg)
+            flash = f"Removed {name}"
+
+        elif action == "update_prices":
+            prices = {}
+            i = 0
+            while f"pname_{i}" in request.form:
+                n = request.form[f"pname_{i}"].strip()
+                try: p = float(request.form[f"pprice_{i}"])
+                except: p = 0
+                if n: prices[n] = p
+                i += 1
+            kv_set("skin_prices", prices)
+            flash = "Prices updated"
+
+        elif action == "add_price":
+            prices = get_skin_prices()
+            n = request.form.get("new_pname","").strip()
+            try: p = float(request.form.get("new_pprice",0))
+            except: p = 0
+            if n: prices[n] = p; kv_set("skin_prices", prices); flash = f"{n} added"
+
+        elif action == "update_ff":
+            ff = get_fifty_freed()
+            try: ff["paid"] = float(request.form["ff_paid"])
+            except: pass
+            try: ff["value"] = float(request.form["ff_value"])
+            except: pass
+            kv_set("fifty_freed", ff)
+            flash = "Package updated"
+
+        elif action == "add_ff_usage":
+            ff = get_fifty_freed()
+            d = request.form.get("ff_date","")
+            try: amt = float(request.form["ff_amount"])
+            except: amt = 0
+            if d and amt: ff["used"].append({"date": d, "amount": amt})
+            kv_set("fifty_freed", ff)
+            flash = "Usage added"
+
+        elif action == "del_ff_usage":
+            ff = get_fifty_freed()
+            try: idx = int(request.form["ff_idx"])
+            except: idx = -1
+            if 0 <= idx < len(ff["used"]): ff["used"].pop(idx)
+            kv_set("fifty_freed", ff)
+            flash = "Usage removed"
+
+        return redirect("/skin" + (f"?flash={flash.replace(' ','+')}"))
+
+    flash = request.args.get("flash","").replace("+"," ")
+    flash_html = f'<div class="flash flash-ok">{flash}</div>' if flash else ""
 
     pkg = get_become_package()
+    prices = get_skin_prices()
+    ff = get_fifty_freed()
 
-    # Price list
-    price_rows = "".join(
-        f'<div class="bar-row"><div class="bar-label">{t}</div>'
-        f'<div style="flex:1"></div>'
-        f'<div class="bar-val" style="width:auto;color:var(--text);font-weight:500">${p}/session</div></div>'
-        for t, p in SKIN_PRICES.items()
+    # ── Price list (editable) ──
+    price_edit_rows = "".join(
+        f'<div class="bar-row" style="gap:8px">'
+        f'<input name="pname_{i}" value="{t}" style="flex:1;padding:5px 8px;font-size:12px">'
+        f'<span style="font-size:12px;color:var(--muted)">$</span>'
+        f'<input type="number" name="pprice_{i}" value="{p}" step="0.01" style="width:80px;padding:5px 8px;font-size:12px">'
+        f'<span style="font-size:11px;color:var(--muted)">/session</span></div>'
+        for i,(t,p) in enumerate(prices.items())
     )
 
-    # Become Aesthetics package
+    # ── Package sessions (editable) ──
     pkg_rows = ""
     for item in pkg:
-        used = item["used"]
-        total = item["total"]
-        left = total - used
-        pct = min(used / total * 100, 100) if total > 0 else 0
-        color = "var(--green-mid)" if pct < 80 else ("var(--amber)" if pct < 100 else "var(--red)")
-        t = item["treatment"]
-        safe_key = t.replace(" ","_")
+        used=item["used"]; total=item["total"]; left=total-used
+        pct=min(used/total*100,100) if total>0 else 0
+        color="var(--green-mid)" if pct<80 else ("var(--amber)" if pct<100 else "var(--red)")
+        sk=item["treatment"].replace(" ","_")
         pkg_rows += (
             f'<div class="entry" style="flex-wrap:wrap;gap:8px">'
-            f'<div class="einfo"><div class="ename">{t}</div>'
+            f'<div class="einfo"><div class="ename">{item["treatment"]}</div>'
             f'<div class="emeta">{used} used · {left} left · {total} total</div></div>'
-            f'<div style="flex:1;min-width:120px"><div class="bar-track" style="height:8px">'
+            f'<div style="flex:1;min-width:80px"><div class="bar-track" style="height:6px">'
             f'<div class="bar-fill" style="width:{pct:.0f}%;background:{color}"></div></div></div>'
             f'<form method="post" style="display:flex;align-items:center;gap:6px;margin:0">'
             f'<input type="hidden" name="action" value="update_package">'
-            f'<label style="font-size:11px;color:var(--muted)">Used:</label>'
-            f'<input type="number" name="used_{safe_key}" value="{used}" min="0" max="{total}" '
-            f'style="width:60px;padding:4px 8px;font-size:12px">'
-            f'<button class="btn-sm btn-save" type="submit">Save</button>'
-            f'</form></div>'
+            f'<label style="font-size:11px;color:var(--muted)">Used</label>'
+            f'<input type="number" name="used_{sk}" value="{used}" min="0" style="width:55px;padding:4px 6px;font-size:12px">'
+            f'<label style="font-size:11px;color:var(--muted)">Total</label>'
+            f'<input type="number" name="total_{sk}" value="{total}" min="0" style="width:55px;padding:4px 6px;font-size:12px">'
+            f'<button class="btn-sm btn-save">Save</button></form>'
+            f'<form method="post" style="margin:0">'
+            f'<input type="hidden" name="action" value="del_treatment">'
+            f'<input type="hidden" name="treatment_name" value="{item["treatment"]}">'
+            f'<button class="btn-sm btn-del">✕</button></form></div>'
         )
 
-    # Fifty Freed package
-    ff = FIFTY_FREED
-    ff_used = sum(u["amount"] for u in ff["used"])
-    ff_left = round(ff["value"] - ff_used, 2)
-    ff_pct = min(ff_used / ff["value"] * 100, 100)
+    # ── Fifty Freed ──
+    ff_used_total = sum(u["amount"] for u in ff["used"])
+    ff_left = round(ff["value"] - ff_used_total, 2)
+    ff_pct = min(ff_used_total / ff["value"] * 100, 100) if ff["value"] else 0
     ff_color = "var(--green-mid)" if ff_pct < 80 else "var(--amber)"
     ff_rows = "".join(
-        f'<div class="bar-row"><div class="bar-label">{u["date"]}</div>'
+        f'<div class="bar-row" style="gap:8px">'
+        f'<div class="bar-label">{u["date"]}</div>'
         f'<div style="flex:1"></div>'
-        f'<div class="bar-val" style="width:auto">${u["amount"]:.2f}</div></div>'
-        for u in ff["used"]
+        f'<div class="bar-val" style="width:auto">${u["amount"]:.2f}</div>'
+        f'<form method="post" style="margin:0">'
+        f'<input type="hidden" name="action" value="del_ff_usage">'
+        f'<input type="hidden" name="ff_idx" value="{i}">'
+        f'<button class="btn-sm btn-del" style="padding:3px 7px">✕</button></form></div>'
+        for i,u in enumerate(ff["used"])
     )
+    today_str = today_sgt().isoformat()
 
     content = f"""
-    <h2 style="font-family:var(--serif);font-size:1.3rem;font-weight:400;margin-bottom:20px">Skin Treatments</h2>
+    <h2 style="font-family:var(--serif);font-size:1.3rem;font-weight:400;margin-bottom:16px">Skin Treatments</h2>
+    {flash_html}
 
-    <div class="grid2" style="margin-bottom:16px">
+    <div class="grid2" style="margin-bottom:14px">
       <div class="card">
-        <div class="card-title">Price per session</div>
-        {price_rows}
-      </div>
-      <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-          <div class="card-title" style="margin:0">Fifty Freed Package</div>
-          <div style="font-size:12px;color:var(--muted)">Paid ${ff["paid"]} · Value ${ff["value"]}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div class="card-title" style="margin:0">Price per session</div>
         </div>
-        <div class="bar-track" style="height:8px;margin-bottom:8px">
+        <form method="post">
+          <input type="hidden" name="action" value="update_prices">
+          {price_edit_rows}
+          <button class="btn-sm btn-save" style="margin-top:8px;width:100%">Save prices</button>
+        </form>
+        <form method="post" style="margin-top:10px;display:flex;gap:6px">
+          <input type="hidden" name="action" value="add_price">
+          <input name="new_pname" placeholder="Treatment name" style="flex:1;padding:5px 8px;font-size:12px">
+          <input type="number" name="new_pprice" placeholder="Price" step="0.01" style="width:80px;padding:5px 8px;font-size:12px">
+          <button class="btn-sm btn-save">Add</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div class="card-title" style="margin:0">Fifty Freed Package</div>
+        </div>
+        <form method="post" style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+          <input type="hidden" name="action" value="update_ff">
+          <div class="field" style="margin:0;flex:1"><label>Paid</label>
+            <input type="number" name="ff_paid" value="{ff["paid"]}" step="0.01" style="font-size:12px"></div>
+          <div class="field" style="margin:0;flex:1"><label>Value</label>
+            <input type="number" name="ff_value" value="{ff["value"]}" step="0.01" style="font-size:12px"></div>
+          <div style="display:flex;align-items:flex-end"><button class="btn-sm btn-save">Save</button></div>
+        </form>
+        <div class="bar-track" style="height:6px;margin-bottom:6px">
           <div class="bar-fill" style="width:{ff_pct:.0f}%;background:{ff_color}"></div>
         </div>
-        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:12px">
-          <span>${ff_used:.2f} used</span><span>${ff_left:.2f} remaining</span>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:10px">
+          <span>${ff_used_total:.2f} used</span><span>${ff_left:.2f} remaining</span>
         </div>
         {ff_rows}
+        <form method="post" style="display:flex;gap:6px;margin-top:8px">
+          <input type="hidden" name="action" value="add_ff_usage">
+          <input type="date" name="ff_date" value="{today_str}" style="flex:1;padding:5px 8px;font-size:12px">
+          <input type="number" name="ff_amount" placeholder="Amount" step="0.01" style="width:90px;padding:5px 8px;font-size:12px">
+          <button class="btn-sm btn-save">Add</button>
+        </form>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-title">Become Aesthetics Package</div>
-      <form method="post">
-        {pkg_rows}
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="card-title" style="margin:0">Treatment Package Sessions</div>
+      </div>
+      {pkg_rows}
+      <form method="post" style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+        <input type="hidden" name="action" value="add_treatment">
+        <input name="treatment_name" placeholder="Treatment name" style="flex:1;min-width:120px;padding:5px 8px;font-size:12px">
+        <input type="number" name="treatment_used" placeholder="Used" value="0" style="width:65px;padding:5px 8px;font-size:12px">
+        <input type="number" name="treatment_total" placeholder="Total" value="0" style="width:65px;padding:5px 8px;font-size:12px">
+        <button class="btn-sm btn-save">Add treatment</button>
       </form>
     </div>
     """
