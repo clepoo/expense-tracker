@@ -665,19 +665,24 @@ def dashboard():
     rec_template_total=sum(r["amount"] for r in rec)
     rec_posted=sum(t["my_amt"] for t in all_month_txns if t["desc"].lower() in rec_names)
     var_exp=total_exp-rec_posted
-    bal=total_income-total_exp
-    bc="var(--green)" if bal>=0 else "var(--red)"
-    income_sub=f'+${sales_income:,.2f} sales' if sales_income>0 else "Salary only"
     if rec_posted>0:
+        # Recurring already in transactions — use actual total
+        effective_total=total_exp
         exp_sub=f'${var_exp:,.2f} variable + ${rec_posted:,.2f} recurring'
     elif rec_template_total>0:
+        # Recurring not posted yet — add template total to show true expected spend
+        effective_total=total_exp+rec_template_total
         exp_sub=f'${total_exp:,.2f} variable + ${rec_template_total:,.2f} recurring (not yet posted)'
     else:
+        effective_total=total_exp
         exp_sub=f'{count} transactions'
+    bal=total_income-effective_total
+    bc="var(--green)" if bal>=0 else "var(--red)"
+    income_sub=f'+${sales_income:,.2f} sales' if sales_income>0 else "Salary only"
 
     stats=f"""<div class="grid3" style="margin-bottom:16px">
       <div class="stat"><div class="stat-label">Income</div><div class="stat-value" style="color:var(--green)">${total_income:,.2f}</div><div class="stat-sub">{income_sub}</div></div>
-      <div class="stat"><div class="stat-label">Total expenses</div><div class="stat-value" style="color:var(--red)">${total_exp:,.2f}</div><div class="stat-sub">{exp_sub}</div></div>
+      <div class="stat"><div class="stat-label">Total expenses</div><div class="stat-value" style="color:var(--red)">${effective_total:,.2f}</div><div class="stat-sub">{exp_sub}</div></div>
       <div class="stat"><div class="stat-label">Balance</div><div class="stat-value" style="color:{bc}">${abs(bal):,.2f}</div><div class="stat-sub">{"surplus" if bal>=0 else "deficit"}</div></div>
     </div>"""
 
@@ -1369,17 +1374,24 @@ async def cmd_summary(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     rec_template_total = sum(r["amount"] for r in rec)
     rec_posted = sum(t["my_amt"] for t in all_mo_txns if t["desc"].lower() in rec_names)
     var_exp = total_exp - rec_posted
+    if rec_posted > 0:
+        eff_total = total_exp
+        rec_line = f"🔁 Recurring (posted): ${rec_posted:.2f}"
+    elif rec_template_total > 0:
+        eff_total = total_exp + rec_template_total
+        rec_line = f"🔁 Recurring (not yet posted): ${rec_template_total:.2f}"
+    else:
+        eff_total = total_exp
+        rec_line = ""
+    eff_bal = total_income - eff_total
     cur_ym = now.strftime("%Y-%m")
     lines.append(f"\n💰 Salary: ${get_salary(ym=cur_ym):.2f}")
     if sales_income > 0:
         lines.append(f"🏷️ Sales: ${sales_income:.2f}")
     lines.append(f"💸 Variable: ${var_exp:.2f}")
-    if rec_posted > 0:
-        lines.append(f"🔁 Recurring (posted): ${rec_posted:.2f}")
-    elif rec_template_total > 0:
-        lines.append(f"🔁 Recurring (not yet posted): ${rec_template_total:.2f}")
-    lines.append(f"💰 Total expenses: ${total_exp:.2f}")
-    lines.append(f"✅ Balance: ${bal:.2f} ({'surplus' if bal>=0 else 'deficit'})")
+    if rec_line: lines.append(rec_line)
+    lines.append(f"💰 Total: ${eff_total:.2f}")
+    lines.append(f"✅ Balance: ${eff_bal:.2f} ({'surplus' if eff_bal>=0 else 'deficit'})")
     await update.message.reply_text("\n\n".join(lines))
 
 async def cmd_miles(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
