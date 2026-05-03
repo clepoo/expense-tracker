@@ -1770,11 +1770,12 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if uid in pending:
         exp = pending[uid]
         tl = text.lower().strip()
-        if tl in ("yes","y","✅","ok","yep","yeah","confirm"):
+        sp = f" (you: ${exp['my_amt']:.2f})" if abs(exp["my_amt"]-exp["total"])>0.01 else ""
+        if tl in ("yes","y","✅","ok","yep","yeah","confirm","qualifying","q"):
+            # Save as qualifying = Yes
             tid = insert_transaction(exp["date"],exp["desc"],exp["category"],
-                                    exp["total"],exp["my_amt"],exp["card"],exp["qualifying"])
+                                    exp["total"],exp["my_amt"],exp["card"],"Yes")
             del pending[uid]
-            sp = f" (you: ${exp['my_amt']:.2f})" if abs(exp["my_amt"]-exp["total"])>0.01 else ""
             # Auto-log to logs table if description matches known treatments
             AUTO_LOG_KEYWORDS = {
                 "invisalign": "Invisalign",
@@ -1808,29 +1809,26 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 f"  {exp['category']} | Qualifying: {exp['qualifying']}"
                 + log_note
             ); return
-        elif tl in ("no","n","❌","cancel","nope"):
+        elif tl in ("no","n","nope","not qualifying","nq","no qualifying"):
+            # Save as qualifying = No
+            tid = insert_transaction(exp["date"],exp["desc"],exp["category"],
+                                    exp["total"],exp["my_amt"],exp["card"],"No")
             del pending[uid]
-            await update.message.reply_text("❌ Cancelled."); return
-        elif tl in ("qualifying","q","y qualifying","yes qualifying"):
-            pending[uid]["qualifying"] = "Yes"
             await update.message.reply_text(
-                f"✅ Marked as qualifying. Reply yes to save or no to cancel.\n"
-                f"{exp['desc']} | ${exp['total']:.2f} | {exp['card']}"
+                f"✅ Saved #{tid}\n\n"
+                f"{CAT_EMOJI.get(exp['category'],'📌')} {exp['desc']}\n"
+                f"  ${exp['total']:.2f}{sp} | {exp['card']} | {exp['date']}\n"
+                f"  {exp['category']} | Qualifying: No"
             ); return
-        elif tl in ("not qualifying","nq","n qualifying","no qualifying","not"):
-            pending[uid]["qualifying"] = "No"
-            await update.message.reply_text(
-                f"✅ Marked as NOT qualifying. Reply yes to save or no to cancel.\n"
-                f"{exp['desc']} | ${exp['total']:.2f} | {exp['card']}"
-            ); return
+        elif tl in ("❌","cancel","discard","abort"):
+            del pending[uid]
+            await update.message.reply_text("❌ Discarded."); return
         else:
-            exp = pending[uid]
-            sp = f" (you: ${exp['my_amt']:.2f})" if abs(exp["my_amt"]-exp["total"])>0.01 else ""
             msg = (
-                "⚠️ Still waiting for confirmation:\n\n"
+                "⚠️ Is this a qualifying charge?\n\n"
                 + f"{CAT_EMOJI.get(exp['category'],'📌')} {exp['desc']}\n"
                 + f"  ${exp['total']:.2f}{sp} | {exp['card']} | {exp['date']}\n\n"
-                + "Reply yes to save, no to cancel."
+                + "yes = qualifying  |  no = not qualifying  |  cancel = discard"
             )
             await update.message.reply_text(msg)
             return
@@ -1852,24 +1850,50 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🤔 I couldn't find an expense\\. Try: `39 los tacos citi rewards`", parse_mode="MarkdownV2")
         return
 
-    pending[uid] = parsed
-    sp = f" (you: ${parsed['my_amt']:.2f})" if abs(parsed.get("my_amt",0)-parsed.get("total",0))>0.01 else ""
-    qual = parsed.get("qualifying","Yes")
-    qual_line = f"  Qualifying: {qual}"
-    # Flag if qualifying was not explicitly stated by user (Claude inferred it)
     user_text_lower = text.lower()
     qual_explicit = any(w in user_text_lower for w in ("yes","no","qualifying","not qualifying"))
-    if not qual_explicit and parsed.get("card","") != "Cash":
-        qual_line = "  Qualifying? — reply YES or NO (or confirm/cancel)"
-    msg = (
-        "Got it — confirm?\n\n"
-        + f"{CAT_EMOJI.get(parsed.get('category',''),'📌')} {parsed.get('desc','')}\n"
-        + f"  ${parsed.get('total',0):.2f}{sp} | {parsed.get('card','')} | {parsed.get('date','')}\n"
-        + f"  {parsed.get('category','')}\n"
-        + qual_line + "\n\n"
-        + "yes = save  |  no = cancel"
-    )
-    await update.message.reply_text(msg)
+    sp = f" (you: ${parsed['my_amt']:.2f})" if abs(parsed.get("my_amt",0)-parsed.get("total",0))>0.01 else ""
+
+    if qual_explicit or parsed.get("card","") == "Cash":
+        # Qualifying explicitly stated — save immediately, no confirmation needed
+        tid = insert_transaction(
+            parsed["date"], parsed["desc"], parsed["category"],
+            parsed["total"], parsed["my_amt"], parsed["card"], parsed["qualifying"]
+        )
+        # Auto-log to logs table if description matches known treatments
+        AUTO_LOG_KEYWORDS = {
+            "invisalign":"Invisalign","lasik":"Lasik","eagle eye":"Lasik",
+            "driving":"Driving","cdc":"Driving","hifu":"Skin Treatments",
+            "sylfirm":"Skin Treatments","juvelook":"Skin Treatments",
+            "fat freeze":"Skin Treatments","become aesthetics":"Skin Treatments",
+            "illumia":"Skin Treatments","tcm":"Other","yakson":"Skin Treatments",
+            "yuet beauty":"Skin Treatments","u aesthetic":"Skin Treatments",
+            "mono studio":"Skin Treatments","next studio":"Skin Treatments",
+        }
+        desc_lower = parsed["desc"].lower()
+        auto_cat = next((cat for kw,cat in AUTO_LOG_KEYWORDS.items() if kw in desc_lower), None)
+        log_note = ""
+        if auto_cat:
+            insert_log(auto_cat, parsed["date"], parsed["desc"], parsed["my_amt"])
+            log_note = f"\n  📋 Also logged to {auto_cat}"
+        await update.message.reply_text(
+            f"✅ Saved #{tid}\n\n"
+            f"{CAT_EMOJI.get(parsed['category'],'📌')} {parsed['desc']}\n"
+            f"  ${parsed['total']:.2f}{sp} | {parsed['card']} | {parsed['date']}\n"
+            f"  {parsed['category']} | Qualifying: {parsed['qualifying']}"
+            + log_note
+        )
+    else:
+        # Qualifying not stated — ask for confirmation
+        pending[uid] = parsed
+        msg = (
+            "Got it — qualifying charge?\n\n"
+            + f"{CAT_EMOJI.get(parsed.get('category',''),'📌')} {parsed.get('desc','')}\n"
+            + f"  ${parsed.get('total',0):.2f}{sp} | {parsed.get('card','')} | {parsed.get('date','')}\n"
+            + f"  {parsed.get('category','')}\n\n"
+            + "yes = save as qualifying  |  no = save as not qualifying  |  cancel = discard"
+        )
+        await update.message.reply_text(msg)
 
 # ── MAIN ──────────────────────────────────────────────────────────
 def run_flask():
