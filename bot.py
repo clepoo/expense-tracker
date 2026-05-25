@@ -1760,6 +1760,7 @@ async def cmd_delete(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 # Image pending — dual in-memory + Turso for resilience
 photo_awaiting_card: dict[int, str] = {}  # uid -> b64 image bytes
 _img_pending_mem: dict[int, dict] = {}   # in-memory fallback
+_last_photo_card: dict[int, str] = {}    # uid -> last card used for a photo
 
 def img_pending_set(uid, data):
     import json as _j
@@ -1854,22 +1855,30 @@ async def handle_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 card = mapped
                 break
 
-    # If no card specified, store image and ask
+    # If no card specified, use last known card or ask
     if not card_hint.strip() and card == "Cash":
-        photo = update.message.photo[-1]
-        file = await ctx.bot.get_file(photo.file_id)
-        import io, base64
-        buf = io.BytesIO()
-        await file.download_to_memory(buf)
-        buf.seek(0)
-        photo_awaiting_card[uid] = base64.b64encode(buf.read()).decode()
-        card_opts = "hsbc revo / citi rewards / dbs wwmc / ocbc / uob ppv / uob privi / trust / cash"
-        await update.message.reply_text(
-            "📸 Got your screenshot! Which card is this for?\n"
-            f"({card_opts})"
-        )
-        return
+        if uid in _last_photo_card:
+            # Use the same card as the previous photo (album send)
+            card = _last_photo_card[uid]
+            log.info(f"Using last photo card for uid {uid}: {card}")
+        else:
+            photo = update.message.photo[-1]
+            file = await ctx.bot.get_file(photo.file_id)
+            import io, base64
+            buf = io.BytesIO()
+            await file.download_to_memory(buf)
+            buf.seek(0)
+            photo_awaiting_card[uid] = base64.b64encode(buf.read()).decode()
+            card_opts = "hsbc revo / citi / dbs / ocbc / ppv / privi / trust / cash"
+            await update.message.reply_text(
+                "📸 Got your screenshot! Which card is this for?\n"
+                f"({card_opts})"
+            )
+            return
 
+    # Save this card for subsequent photos in the same album
+    if card != "Cash":
+        _last_photo_card[uid] = card
     thinking = await update.message.reply_text(
         f"📸 Reading screenshot{f' ({card})' if card != 'Cash' else ''}..."
     )
@@ -2017,6 +2026,7 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         for c in CARDS:
             if c.lower() in card_lower: card = c; break
         qual = "No" if card == "Cash" else "Yes"
+        if card != "Cash": _last_photo_card[uid] = card
         thinking = await update.message.reply_text(f"📸 Reading screenshot ({card})...")
         try:
             import json as _json
