@@ -1861,30 +1861,27 @@ async def handle_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         card_hint = _media_group_card[media_group_id]
         log.info(f"Using media group card: {card_hint} for group {media_group_id}")
 
-    # Normalize card hint
+    # Normalize card hint — only match if caption is non-empty
     card = "Cash"
-    card_lower = card_hint.lower()
-    for c in CARDS:
-        if c.lower() in card_lower or card_lower in c.lower():
-            card = c
-            break
-    # Fuzzy card matching
-    card_map = {
-        "hsbc": "HSBC REVO", "revo": "HSBC REVO",
-        "citi rewards": "CITI REWARDS", "citi": "CITI REWARDS",
-        "dbs": "DBS WWMC", "wwmc": "DBS WWMC",
-        "ocbc": "OCBC REWARDS",
-        "ppv contactless": "UOB PPV Contactless", "ppv online": "UOB PPV Online",
-        "ppv": "UOB PPV Contactless",
-        "privi": "UOB PRIVI",
-        "vs sgd": "UOB VS SGD", "vs fcy": "UOB VS FCY",
-        "trust": "TRUST",
-    }
-    if card == "Cash":
+    card_lower = card_hint.lower().strip()
+    if card_lower:  # only attempt matching if user provided a caption
+        card_map = {
+            "hsbc": "HSBC REVO", "revo": "HSBC REVO",
+            "citi rewards": "CITI REWARDS", "citi": "CITI REWARDS",
+            "dbs": "DBS WWMC", "wwmc": "DBS WWMC",
+            "ocbc": "OCBC REWARDS",
+            "ppv contactless": "UOB PPV Contactless", "ppv online": "UOB PPV Online",
+            "ppv": "UOB PPV Contactless", "privi": "UOB PRIVI",
+            "vs sgd": "UOB VS SGD", "vs fcy": "UOB VS FCY",
+            "trust": "TRUST",
+        }
         for kw, mapped in card_map.items():
             if kw in card_lower:
-                card = mapped
-                break
+                card = mapped; break
+        if card == "Cash":
+            for c in CARDS:
+                if c.lower() in card_lower:
+                    card = c; break
 
     # If no card specified, use last known card or ask
     if not card_hint.strip() and card == "Cash":
