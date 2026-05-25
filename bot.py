@@ -1758,6 +1758,7 @@ async def cmd_delete(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # Stores extracted transactions from screenshot awaiting confirmation
 image_pending: dict[int, dict] = {}  # uid -> {card, transactions: [...]}
+photo_awaiting_card: dict[int, bytes] = {}  # uid -> raw image bytes, waiting for card name
 
 IMAGE_PARSE_SYSTEM = """You are a bank transaction extractor for a Singapore user.
 The user has sent a screenshot of their bank/card app transaction history.
@@ -1809,6 +1810,22 @@ async def handle_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             if kw in card_lower:
                 card = mapped
                 break
+
+    # If no card specified, store image and ask
+    if not card_hint.strip() and card == "Cash":
+        photo = update.message.photo[-1]
+        file = await ctx.bot.get_file(photo.file_id)
+        import io, base64
+        buf = io.BytesIO()
+        await file.download_to_memory(buf)
+        buf.seek(0)
+        photo_awaiting_card[uid] = base64.b64encode(buf.read()).decode()
+        card_opts = "hsbc revo / citi rewards / dbs wwmc / ocbc / uob ppv / uob privi / trust / cash"
+        await update.message.reply_text(
+            "📸 Got your screenshot! Which card is this for?\n"
+            f"({card_opts})"
+        )
+        return
 
     thinking = await update.message.reply_text(
         f"📸 Reading screenshot{f' ({card})' if card != 'Cash' else ''}..."
@@ -2024,7 +2041,7 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     await thinking.delete()
     if "error" in parsed:
-        await update.message.reply_text("🤔 I couldn't find an expense\\. Try: `39 los tacos citi rewards`", parse_mode="MarkdownV2")
+        await update.message.reply_text("🤔 I couldn't find an expense. Try: 39 los tacos citi rewards")
         return
 
     user_text_lower = text.lower()
