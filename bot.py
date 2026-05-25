@@ -1760,7 +1760,32 @@ async def cmd_delete(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 # Image pending — dual in-memory + Turso for resilience
 photo_awaiting_card: dict[int, str] = {}  # uid -> b64 image bytes
 _img_pending_mem: dict[int, dict] = {}   # in-memory fallback
-_last_photo_card: dict[int, str] = {}    # uid -> last card used for a photo
+_media_group_card: dict[str, str] = {}   # media_group_id -> card
+_last_photo_card: dict[int, str] = {}    # uid -> last card used for a photo (in-memory cache)
+
+def set_last_photo_card(uid, card):
+    set_last_photo_card(uid, card)
+    conn = get_conn()
+    try:
+        conn.execute("INSERT OR REPLACE INTO kv_store (key,data) VALUES (?,?)", (f"lastcard_{uid}", card))
+        db_commit(conn)
+    except: pass
+    finally: conn.close()
+
+def get_last_photo_card(uid):
+    if uid in _last_photo_card:
+        return _last_photo_card[uid]
+    conn = get_conn()
+    try:
+        cur = conn.execute("SELECT data FROM kv_store WHERE key=?", (f"lastcard_{uid}",))
+        row = cur.fetchone()
+        conn.close()
+        val = row[0] if row else None
+        if val: _last_photo_card[uid] = val
+        return val
+    except:
+        conn.close()
+        return None
 
 def img_pending_set(uid, data):
     import json as _j
@@ -1829,6 +1854,12 @@ async def handle_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # Get card from caption or previous message context
     caption = (update.message.caption or "").strip()
     card_hint = caption if caption else ""
+    media_group_id = update.message.media_group_id  # not None when sent as album
+
+    # If part of an album and no caption, use the card from the first photo in the group
+    if not card_hint and media_group_id and media_group_id in _media_group_card:
+        card_hint = _media_group_card[media_group_id]
+        log.info(f"Using media group card: {card_hint} for group {media_group_id}")
 
     # Normalize card hint
     card = "Cash"
@@ -1857,9 +1888,10 @@ async def handle_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     # If no card specified, use last known card or ask
     if not card_hint.strip() and card == "Cash":
-        if uid in _last_photo_card:
+        _last_card = get_last_photo_card(uid)
+        if _last_card:
             # Use the same card as the previous photo (album send)
-            card = _last_photo_card[uid]
+            card = _last_card
             log.info(f"Using last photo card for uid {uid}: {card}")
         else:
             photo = update.message.photo[-1]
@@ -1878,7 +1910,9 @@ async def handle_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     # Save this card for subsequent photos in the same album
     if card != "Cash":
-        _last_photo_card[uid] = card
+        set_last_photo_card(uid, card)
+        if media_group_id:
+            _media_group_card[media_group_id] = card
     thinking = await update.message.reply_text(
         f"📸 Reading screenshot{f' ({card})' if card != 'Cash' else ''}..."
     )
@@ -2026,7 +2060,7 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         for c in CARDS:
             if c.lower() in card_lower: card = c; break
         qual = "No" if card == "Cash" else "Yes"
-        if card != "Cash": _last_photo_card[uid] = card
+        if card != "Cash": set_last_photo_card(uid, card)
         thinking = await update.message.reply_text(f"📸 Reading screenshot ({card})...")
         try:
             import json as _json
