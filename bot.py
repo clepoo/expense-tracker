@@ -1757,8 +1757,25 @@ async def cmd_delete(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 # Stores extracted transactions from screenshot awaiting confirmation
-image_pending: dict[int, dict] = {}  # uid -> {card, transactions: [...]}
-photo_awaiting_card: dict[int, bytes] = {}  # uid -> raw image bytes, waiting for card name
+# Image pending stored in Turso (survives restarts)
+photo_awaiting_card: dict[int, str] = {}  # uid -> b64 image bytes, in-memory only (short-lived)
+
+def img_pending_set(uid, data):
+    kv_set(f"imgpend_{uid}", data)
+
+def img_pending_get(uid):
+    return kv_get(f"imgpend_{uid}")
+
+def img_pending_del(uid):
+    conn = get_conn()
+    try:
+        conn.execute("DELETE FROM kv_store WHERE key=?", (f"imgpend_{uid}",))
+        db_commit(conn)
+    except: pass
+    finally: conn.close()
+
+def img_pending_exists(uid):
+    return img_pending_get(uid) is not None
 
 IMAGE_PARSE_SYSTEM = """You are a bank transaction extractor for a Singapore user.
 The user has sent a screenshot of their bank/card app transaction history.
@@ -1903,12 +1920,15 @@ async def handle_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "cancel — discard all"
     )
 
-    image_pending[uid] = {"card": card, "qualifying": qual_default, "transactions": transactions}
+    img_pending_set(uid, {"card": card, "qualifying": qual_default, "transactions": transactions})
     await update.message.reply_text("\n\n".join(lines))
 
 async def handle_image_confirm(update: Update, uid: int, text: str):
     """Handle confirmation/skip for image-extracted transactions."""
-    data = image_pending[uid]
+    data = img_pending_get(uid)
+    if not data:
+        await update.message.reply_text("Session expired. Please send the screenshot again.")
+        return
     txns = data["transactions"]
     card = data["card"]
     qual = data["qualifying"]
@@ -1922,7 +1942,7 @@ async def handle_image_confirm(update: Update, uid: int, text: str):
             except: pass
 
     if tl == "cancel":
-        del image_pending[uid]
+        img_pending_del(uid)
         await update.message.reply_text("❌ Discarded.")
         return
 
@@ -1936,7 +1956,7 @@ async def handle_image_confirm(update: Update, uid: int, text: str):
                 t["amount"], t["amount"], card, qual
             )
             saved += 1
-        del image_pending[uid]
+        img_pending_del(uid)
         skipped = len(skip_indices)
         msg = f"✅ Saved {saved} transaction(s) to {card}"
         if skipped:
