@@ -1757,25 +1757,31 @@ async def cmd_delete(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 # Stores extracted transactions from screenshot awaiting confirmation
-# Image pending stored in Turso (survives restarts)
-photo_awaiting_card: dict[int, str] = {}  # uid -> b64 image bytes, in-memory only (short-lived)
+# Image pending — dual in-memory + Turso for resilience
+photo_awaiting_card: dict[int, str] = {}  # uid -> b64 image bytes
+_img_pending_mem: dict[int, dict] = {}   # in-memory fallback
 
 def img_pending_set(uid, data):
-    kv_set(f"imgpend_{uid}", data)
+    _img_pending_mem[uid] = data
+    try: kv_set(f"imgpend_{uid}", data)
+    except: pass
 
 def img_pending_get(uid):
-    return kv_get(f"imgpend_{uid}")
+    if uid in _img_pending_mem:
+        return _img_pending_mem[uid]
+    try: return kv_get(f"imgpend_{uid}")
+    except: return None
 
 def img_pending_del(uid):
-    conn = get_conn()
+    _img_pending_mem.pop(uid, None)
     try:
+        conn = get_conn()
         conn.execute("DELETE FROM kv_store WHERE key=?", (f"imgpend_{uid}",))
-        db_commit(conn)
+        db_commit(conn); conn.close()
     except: pass
-    finally: conn.close()
 
 def img_pending_exists(uid):
-    return img_pending_get(uid) is not None
+    return uid in _img_pending_mem or img_pending_get(uid) is not None
 
 IMAGE_PARSE_SYSTEM = """You are a bank transaction extractor for a Singapore user.
 The user has sent a screenshot of their bank/card app transaction history.
@@ -2046,6 +2052,12 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             )
             await update.message.reply_text(msg)
             return
+
+    # Catch save/skip/cancel with nothing pending
+    _tl = text.lower().strip()
+    if _tl in ("save","cancel","discard") or _tl.startswith("skip"):
+        await update.message.reply_text("No screenshot pending. Send a screenshot first.")
+        return
 
     thinking=await update.message.reply_text("⏳ Parsing…")
     try:
