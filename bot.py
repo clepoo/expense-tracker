@@ -1755,6 +1755,183 @@ async def cmd_delete(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     ok = delete_transaction(int(ctx.args[0]))
     await update.message.reply_text(f"✅ Deleted #{ctx.args[0]}." if ok else f"❌ No transaction #{ctx.args[0]}.")
 
+
+# Stores extracted transactions from screenshot awaiting confirmation
+image_pending: dict[int, dict] = {}  # uid -> {card, transactions: [...]}
+
+IMAGE_PARSE_SYSTEM = """You are a bank transaction extractor for a Singapore user.
+The user has sent a screenshot of their bank/card app transaction history.
+
+Extract ALL transactions visible in the screenshot. For each transaction return:
+- date: YYYY-MM-DD format. If year not shown, assume current year.
+- desc: merchant name, clean and title-cased
+- amount: the transaction amount as a positive float (debit/spend only, skip refunds/credits unless clearly a purchase)
+- category: infer from merchant (Food, Groceries, Shopping, Transport, Travel, Health Beauty & Wellness, Entertainment, Bills, Investments, Misc)
+
+Respond ONLY with a JSON array, no other text:
+[
+  {"date": "2026-04-15", "desc": "Merchant Name", "amount": 12.50, "category": "Food"},
+  ...
+]
+
+If no transactions are visible or the image is not a bank statement, return: []
+"""
+
+async def handle_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not is_allowed(update): return await reject(update)
+    uid = update.effective_user.id
+
+    # Get card from caption or previous message context
+    caption = (update.message.caption or "").strip()
+    card_hint = caption if caption else ""
+
+    # Normalize card hint
+    card = "Cash"
+    card_lower = card_hint.lower()
+    for c in CARDS:
+        if c.lower() in card_lower or card_lower in c.lower():
+            card = c
+            break
+    # Fuzzy card matching
+    card_map = {
+        "hsbc": "HSBC REVO", "revo": "HSBC REVO",
+        "citi rewards": "CITI REWARDS", "citi": "CITI REWARDS",
+        "dbs": "DBS WWMC", "wwmc": "DBS WWMC",
+        "ocbc": "OCBC REWARDS",
+        "ppv contactless": "UOB PPV Contactless", "ppv online": "UOB PPV Online",
+        "ppv": "UOB PPV Contactless",
+        "privi": "UOB PRIVI",
+        "vs sgd": "UOB VS SGD", "vs fcy": "UOB VS FCY",
+        "trust": "TRUST",
+    }
+    if card == "Cash":
+        for kw, mapped in card_map.items():
+            if kw in card_lower:
+                card = mapped
+                break
+
+    thinking = await update.message.reply_text(
+        f"📸 Reading screenshot{f' ({card})' if card != 'Cash' else ''}..."
+    )
+
+    try:
+        # Download the photo
+        photo = update.message.photo[-1]  # largest size
+        file = await ctx.bot.get_file(photo.file_id)
+        import io, base64
+        buf = io.BytesIO()
+        await file.download_to_memory(buf)
+        buf.seek(0)
+        img_b64 = base64.b64encode(buf.read()).decode()
+
+        # Send to Claude vision
+        resp = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1500,
+            system=IMAGE_PARSE_SYSTEM,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {"type": "base64", "media_type": "image/jpeg", "data": img_b64}
+                    },
+                    {
+                        "type": "text",
+                        "text": f"Extract all transactions. Card used: {card}. Today is {today_sgt().isoformat()}."
+                    }
+                ]
+            }]
+        )
+
+        raw = resp.content[0].text.strip().replace("```json","").replace("```","").strip()
+        if not raw.startswith("["):
+            s = raw.find("["); e = raw.rfind("]")+1
+            raw = raw[s:e] if s>=0 and e>s else "[]"
+        import json
+        transactions = json.loads(raw)
+
+    except Exception as e:
+        log.error(f"Photo parse error: {e}")
+        await thinking.delete()
+        await update.message.reply_text(f"⚠️ Could not read screenshot: {e}")
+        return
+
+    await thinking.delete()
+
+    if not transactions:
+        await update.message.reply_text(
+            "🤔 No transactions found in that screenshot.\n"
+            "Make sure it shows a transaction history list."
+        )
+        return
+
+    # Show extracted transactions
+    if card == "Cash":
+        qual_default = "No"
+    else:
+        qual_default = "Yes"
+
+    lines = [f"Found {len(transactions)} transaction(s) — {card}:\n"]
+    for i, t in enumerate(transactions, 1):
+        lines.append(
+            f"{i}. {t['desc']}\n"
+            f"   ${t['amount']:.2f} · {t['category']} · {t['date']}"
+        )
+
+    lines.append(
+        "\nReply:\n"
+        "save — save all\n"
+        "skip 2 4 — save all except #2 and #4\n"
+        "cancel — discard all"
+    )
+
+    image_pending[uid] = {"card": card, "qualifying": qual_default, "transactions": transactions}
+    await update.message.reply_text("\n\n".join(lines))
+
+async def handle_image_confirm(update: Update, uid: int, text: str):
+    """Handle confirmation/skip for image-extracted transactions."""
+    data = image_pending[uid]
+    txns = data["transactions"]
+    card = data["card"]
+    qual = data["qualifying"]
+    tl = text.lower().strip()
+
+    skip_indices = set()
+    if tl.startswith("skip"):
+        parts = tl.replace("skip","").split()
+        for p in parts:
+            try: skip_indices.add(int(p)-1)
+            except: pass
+
+    if tl == "cancel":
+        del image_pending[uid]
+        await update.message.reply_text("❌ Discarded.")
+        return
+
+    if tl.startswith("save") or tl.startswith("skip"):
+        saved = 0
+        for i, t in enumerate(txns):
+            if i in skip_indices:
+                continue
+            insert_transaction(
+                t["date"], t["desc"], t.get("category","Misc"),
+                t["amount"], t["amount"], card, qual
+            )
+            saved += 1
+        del image_pending[uid]
+        skipped = len(skip_indices)
+        msg = f"✅ Saved {saved} transaction(s) to {card}"
+        if skipped:
+            msg += f" ({skipped} skipped)"
+        await update.message.reply_text(msg)
+        return
+
+    # Unrecognised reply
+    await update.message.reply_text(
+        "Reply save, skip <numbers>, or cancel."
+    )
+
 async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update): return await reject(update)
     text=update.message.text.strip()
@@ -1914,6 +2091,7 @@ def main():
     tg.add_handler(CommandHandler("edit",      cmd_edit))
     tg.add_handler(CommandHandler("sell",      cmd_sell))
     tg.add_handler(CommandHandler("delete",    cmd_delete))
+    tg.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     tg.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     log.info("Telegram bot polling…")
     tg.run_polling(allowed_updates=Update.ALL_TYPES)
