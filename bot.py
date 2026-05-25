@@ -1762,26 +1762,46 @@ photo_awaiting_card: dict[int, str] = {}  # uid -> b64 image bytes
 _img_pending_mem: dict[int, dict] = {}   # in-memory fallback
 
 def img_pending_set(uid, data):
-    _img_pending_mem[uid] = data
-    try: kv_set(f"imgpend_{uid}", data)
-    except: pass
+    import json as _j
+    conn = get_conn()
+    try:
+        conn.execute("CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, data TEXT NOT NULL)")
+        conn.execute("INSERT OR REPLACE INTO kv_store (key, data) VALUES (?,?)", (f"imgpend_{uid}", _j.dumps(data)))
+        db_commit(conn)
+        log.info(f"img_pending_set: stored key imgpend_{uid}")
+    except Exception as e:
+        log.error(f"img_pending_set failed: {e}")
+    finally:
+        conn.close()
 
 def img_pending_get(uid):
-    if uid in _img_pending_mem:
-        return _img_pending_mem[uid]
-    try: return kv_get(f"imgpend_{uid}")
-    except: return None
+    import json as _j
+    conn = get_conn()
+    try:
+        conn.execute("CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, data TEXT NOT NULL)")
+        cur = conn.execute("SELECT data FROM kv_store WHERE key=?", (f"imgpend_{uid}",))
+        row = cur.fetchone()
+        conn.close()
+        result = _j.loads(row[0]) if row else None
+        log.info(f"img_pending_get: uid={uid} found={result is not None}")
+        return result
+    except Exception as e:
+        log.error(f"img_pending_get failed: {e}")
+        conn.close()
+        return None
 
 def img_pending_del(uid):
-    _img_pending_mem.pop(uid, None)
+    conn = get_conn()
     try:
-        conn = get_conn()
         conn.execute("DELETE FROM kv_store WHERE key=?", (f"imgpend_{uid}",))
-        db_commit(conn); conn.close()
-    except: pass
+        db_commit(conn)
+    except Exception as e:
+        log.error(f"img_pending_del failed: {e}")
+    finally:
+        conn.close()
 
 def img_pending_exists(uid):
-    return uid in _img_pending_mem or img_pending_get(uid) is not None
+    return img_pending_get(uid) is not None
 
 IMAGE_PARSE_SYSTEM = """You are a bank transaction extractor for a Singapore user.
 The user has sent a screenshot of their bank/card app transaction history.
@@ -1980,6 +2000,57 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     text=update.message.text.strip()
     uid=update.effective_user.id
 
+    # Handle photo awaiting card name
+    if uid in photo_awaiting_card:
+        img_b64 = photo_awaiting_card.pop(uid)
+        card_lower = text.lower()
+        card = "Cash"
+        card_map = {
+            "hsbc": "HSBC REVO", "revo": "HSBC REVO",
+            "citi": "CITI REWARDS", "dbs": "DBS WWMC", "wwmc": "DBS WWMC",
+            "ocbc": "OCBC REWARDS", "ppv": "UOB PPV Contactless",
+            "privi": "UOB PRIVI", "vs sgd": "UOB VS SGD", "vs fcy": "UOB VS FCY",
+            "trust": "TRUST",
+        }
+        for kw, mapped in card_map.items():
+            if kw in card_lower: card = mapped; break
+        for c in CARDS:
+            if c.lower() in card_lower: card = c; break
+        qual = "No" if card == "Cash" else "Yes"
+        thinking = await update.message.reply_text(f"📸 Reading screenshot ({card})...")
+        try:
+            import json as _json
+            resp = client.messages.create(
+                model="claude-sonnet-4-20250514", max_tokens=1500,
+                system=IMAGE_PARSE_SYSTEM,
+                messages=[{"role":"user","content":[
+                    {"type":"image","source":{"type":"base64","media_type":"image/jpeg","data":img_b64}},
+                    {"type":"text","text":f"Extract all transactions. Card: {card}. Today: {today_sgt().isoformat()}."}]}]
+            )
+            raw = resp.content[0].text.strip().replace("```json","").replace("```","").strip()
+            if not raw.startswith("["): s=raw.find("["); e=raw.rfind("]")+1; raw=raw[s:e] if s>=0 and e>s else "[]"
+            transactions = _json.loads(raw)
+        except Exception as e:
+            await thinking.delete()
+            await update.message.reply_text(f"⚠️ Could not read screenshot: {e}")
+            return
+        await thinking.delete()
+        if not transactions:
+            await update.message.reply_text("🤔 No transactions found in screenshot.")
+            return
+        lines = [f"Found {len(transactions)} transaction(s) — {card}:\n"]
+        for i, t in enumerate(transactions, 1):
+            lines.append(f"{i}. {t['desc']}\n   ${t['amount']:.2f} · {t.get('category','Misc')} · {t['date']}")
+        lines.append("\nReply:\nsave — save all\nskip 2 4 — skip specific ones\ncancel — discard all")
+        img_pending_set(uid, {"card": card, "qualifying": qual, "transactions": transactions})
+        await update.message.reply_text("\n\n".join(lines))
+        return
+
+    # Handle image confirmation if pending
+    if img_pending_exists(uid):
+        await handle_image_confirm(update, uid, text)
+        return
+
     # Handle /recurring set inline
     if text.lower().startswith("/recurring set") or text.lower().startswith("/recurring"):
         parts=text.split()
@@ -2052,12 +2123,6 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             )
             await update.message.reply_text(msg)
             return
-
-    # Catch save/skip/cancel with nothing pending
-    _tl = text.lower().strip()
-    if _tl in ("save","cancel","discard") or _tl.startswith("skip"):
-        await update.message.reply_text("No screenshot pending. Send a screenshot first.")
-        return
 
     thinking=await update.message.reply_text("⏳ Parsing…")
     try:
