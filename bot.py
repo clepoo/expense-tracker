@@ -467,9 +467,12 @@ Card matching — the user will often write abbreviated/lowercase card names, ma
 - "uob ppv contactless" or "ppv contactless" or "ppv" → UOB PPV Contactless
 - "uob ppv online" or "ppv online" → UOB PPV Online
 - "uob privi" or "privi" → UOB PRIVI
-- "uob vs sgd" or "vs sgd" → UOB VS SGD
-- "uob vs fcy" or "vs fcy" → UOB VS FCY
+- "uob vs sgd" or "vs sgd" or "uobvssgd" → UOB VS SGD
+- "uob vs fcy" or "vs fcy" or "uobvsfcy" or "fcy" → UOB VS FCY
 - "trust" → TRUST
+IMPORTANT: "uob vs fcy" and "uob vs sgd" are Visa Signature cards, NOT UOB PRIVI or UOB PPV.
+If user says "vs fcy" or "fcy" → always map to UOB VS FCY.
+If user says "vs sgd" or "sgd" in card context → always map to UOB VS SGD.
 
 Amount parsing — message format is: [total] [my_share?] [description] [card?] [yes/no?]
 - If ONE number at the start: that is total, and my_amt = total (full amount is yours)
@@ -1872,7 +1875,7 @@ async def handle_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             "ocbc": "OCBC REWARDS",
             "ppv contactless": "UOB PPV Contactless", "ppv online": "UOB PPV Online",
             "ppv": "UOB PPV Contactless", "privi": "UOB PRIVI",
-            "vs sgd": "UOB VS SGD", "vs fcy": "UOB VS FCY",
+            "vs sgd": "UOB VS SGD", "vs fcy": "UOB VS FCY", "fcy": "UOB VS FCY", "sgd": "UOB VS SGD",
             "trust": "TRUST",
         }
         for kw, mapped in card_map.items():
@@ -1883,21 +1886,29 @@ async def handle_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 if c.lower() in card_lower:
                     card = c; break
 
+    # Get the file — works for both photo and document
+    import io, base64
+    if update.message.photo:
+        file_id = update.message.photo[-1].file_id
+    elif update.message.document and update.message.document.mime_type and "image" in update.message.document.mime_type:
+        file_id = update.message.document.file_id
+    else:
+        await update.message.reply_text("Please send an image file.")
+        return
+    file = await ctx.bot.get_file(file_id)
+    buf = io.BytesIO()
+    await file.download_to_memory(buf)
+    buf.seek(0)
+    img_b64 = base64.b64encode(buf.read()).decode()
+
     # If no card specified, use last known card or ask
     if not card_hint.strip() and card == "Cash":
         _last_card = get_last_photo_card(uid)
         if _last_card:
-            # Use the same card as the previous photo (album send)
             card = _last_card
             log.info(f"Using last photo card for uid {uid}: {card}")
         else:
-            photo = update.message.photo[-1]
-            file = await ctx.bot.get_file(photo.file_id)
-            import io, base64
-            buf = io.BytesIO()
-            await file.download_to_memory(buf)
-            buf.seek(0)
-            photo_awaiting_card[uid] = base64.b64encode(buf.read()).decode()
+            photo_awaiting_card[uid] = img_b64
             card_opts = "hsbc revo / citi / dbs / ocbc / ppv / privi / trust / cash"
             await update.message.reply_text(
                 "📸 Got your screenshot! Which card is this for?\n"
@@ -1915,14 +1926,6 @@ async def handle_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     )
 
     try:
-        # Download the photo
-        photo = update.message.photo[-1]  # largest size
-        file = await ctx.bot.get_file(photo.file_id)
-        import io, base64
-        buf = io.BytesIO()
-        await file.download_to_memory(buf)
-        buf.seek(0)
-        img_b64 = base64.b64encode(buf.read()).decode()
 
         # Send to Claude vision
         resp = client.messages.create(
@@ -2049,7 +2052,7 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             "hsbc": "HSBC REVO", "revo": "HSBC REVO",
             "citi": "CITI REWARDS", "dbs": "DBS WWMC", "wwmc": "DBS WWMC",
             "ocbc": "OCBC REWARDS", "ppv": "UOB PPV Contactless",
-            "privi": "UOB PRIVI", "vs sgd": "UOB VS SGD", "vs fcy": "UOB VS FCY",
+            "privi": "UOB PRIVI", "vs sgd": "UOB VS SGD", "vs fcy": "UOB VS FCY", "fcy": "UOB VS FCY", "sgd": "UOB VS SGD",
             "trust": "TRUST",
         }
         for kw, mapped in card_map.items():
@@ -2247,6 +2250,7 @@ def main():
     tg.add_handler(CommandHandler("sell",      cmd_sell))
     tg.add_handler(CommandHandler("delete",    cmd_delete))
     tg.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    tg.add_handler(MessageHandler(filters.Document.IMAGE, handle_photo))
     tg.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     log.info("Telegram bot polling…")
     tg.run_polling(allowed_updates=Update.ALL_TYPES)
