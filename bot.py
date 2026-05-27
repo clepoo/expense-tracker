@@ -1909,7 +1909,7 @@ async def handle_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             log.info(f"Using last photo card for uid {uid}: {card}")
         else:
             photo_awaiting_card[uid] = img_b64
-            card_opts = "hsbc revo / citi / dbs / ocbc / ppv / privi / trust / cash"
+            card_opts = "hsbc revo / citi / dbs / ocbc / ppv / privi / vs fcy / vs sgd / trust / cash"
             await update.message.reply_text(
                 "📸 Got your screenshot! Which card is this for?\n"
                 f"({card_opts})"
