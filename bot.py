@@ -41,6 +41,40 @@ CARDS = [
     "CITI REWARDS","HSBC REVO","UOB PPV Contactless","UOB PPV Online",
     "DBS WWMC","OCBC REWARDS","UOB PRIVI","UOB VS SGD","UOB VS FCY","TRUST","Cash",
 ]
+# ── CARD ALIAS MAP (single source of truth) ───────────────────────
+CARD_ALIASES = {
+    "hsbc revo": "HSBC REVO", "hsbc": "HSBC REVO", "revo": "HSBC REVO",
+    "citi rewards": "CITI REWARDS", "citi": "CITI REWARDS",
+    "dbs wwmc": "DBS WWMC", "dbs": "DBS WWMC", "wwmc": "DBS WWMC",
+    "ocbc rewards": "OCBC REWARDS", "ocbc": "OCBC REWARDS",
+    "uob ppv contactless": "UOB PPV Contactless", "ppv contactless": "UOB PPV Contactless",
+    "uob ppv online": "UOB PPV Online", "ppv online": "UOB PPV Online",
+    "ppv": "UOB PPV Contactless",
+    "uob privi": "UOB PRIVI", "privi": "UOB PRIVI",
+    "uob vs sgd": "UOB VS SGD", "vs sgd": "UOB VS SGD",
+    "uob vs fcy": "UOB VS FCY", "vs fcy": "UOB VS FCY", "fcy": "UOB VS FCY",
+    "trust": "TRUST",
+    "cash": "Cash",
+}
+
+def match_card(text):
+    t = text.lower().strip()
+    if not t:
+        return "Cash"
+    for alias in sorted(CARD_ALIASES.keys(), key=len, reverse=True):
+        if alias in t:
+            return CARD_ALIASES[alias]
+    for c in CARDS:
+        if c.lower() in t:
+            return c
+    return "Cash"
+
+CARD_OPTIONS = " / ".join([
+    "hsbc revo", "citi rewards", "dbs wwmc", "ocbc rewards",
+    "ppv contactless", "ppv online", "uob privi",
+    "vs fcy", "vs sgd", "trust", "cash"
+])
+
 CATEGORIES = [
     "Food","Groceries","Shopping","Transport","Travel",
     "Health, Beauty & Wellness","Entertainment","Bills","Investments","Misc",
@@ -1864,27 +1898,7 @@ async def handle_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         card_hint = _media_group_card[media_group_id]
         log.info(f"Using media group card: {card_hint} for group {media_group_id}")
 
-    # Normalize card hint — only match if caption is non-empty
-    card = "Cash"
-    card_lower = card_hint.lower().strip()
-    if card_lower:  # only attempt matching if user provided a caption
-        card_map = {
-            "hsbc": "HSBC REVO", "revo": "HSBC REVO",
-            "citi rewards": "CITI REWARDS", "citi": "CITI REWARDS",
-            "dbs": "DBS WWMC", "wwmc": "DBS WWMC",
-            "ocbc": "OCBC REWARDS",
-            "ppv contactless": "UOB PPV Contactless", "ppv online": "UOB PPV Online",
-            "ppv": "UOB PPV Contactless", "privi": "UOB PRIVI",
-            "vs sgd": "UOB VS SGD", "vs fcy": "UOB VS FCY", "fcy": "UOB VS FCY", "sgd": "UOB VS SGD",
-            "trust": "TRUST",
-        }
-        for kw, mapped in card_map.items():
-            if kw in card_lower:
-                card = mapped; break
-        if card == "Cash":
-            for c in CARDS:
-                if c.lower() in card_lower:
-                    card = c; break
+    card = match_card(card_hint)
 
     # Get the file — works for both photo and document
     import io, base64
@@ -1909,7 +1923,7 @@ async def handle_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             log.info(f"Using last photo card for uid {uid}: {card}")
         else:
             photo_awaiting_card[uid] = img_b64
-            card_opts = "hsbc revo / citi / dbs / ocbc / ppv / privi / vs fcy / vs sgd / trust / cash"
+            card_opts = CARD_OPTIONS
             await update.message.reply_text(
                 "📸 Got your screenshot! Which card is this for?\n"
                 f"({card_opts})"
@@ -2046,19 +2060,7 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # Handle photo awaiting card name
     if uid in photo_awaiting_card:
         img_b64 = photo_awaiting_card.pop(uid)
-        card_lower = text.lower()
-        card = "Cash"
-        card_map = {
-            "hsbc": "HSBC REVO", "revo": "HSBC REVO",
-            "citi": "CITI REWARDS", "dbs": "DBS WWMC", "wwmc": "DBS WWMC",
-            "ocbc": "OCBC REWARDS", "ppv": "UOB PPV Contactless",
-            "privi": "UOB PRIVI", "vs sgd": "UOB VS SGD", "vs fcy": "UOB VS FCY", "fcy": "UOB VS FCY", "sgd": "UOB VS SGD",
-            "trust": "TRUST",
-        }
-        for kw, mapped in card_map.items():
-            if kw in card_lower: card = mapped; break
-        for c in CARDS:
-            if c.lower() in card_lower: card = c; break
+        card = match_card(text)
         qual = "No" if card == "Cash" else "Yes"
         if card != "Cash": set_last_photo_card(uid, card)
         thinking = await update.message.reply_text(f"📸 Reading screenshot ({card})...")
