@@ -547,7 +547,7 @@ If you cannot parse an expense at all, return: {{"error": "not an expense"}}
 
 def parse_expense_with_claude(text):
     resp = client.messages.create(
-        model="claude-sonnet-4-20250514", max_tokens=400,
+        model="claude-sonnet-4-6", max_tokens=400,
         system=build_parse_system(), messages=[{"role":"user","content":text}]
     )
     raw = resp.content[0].text.strip()
@@ -1943,7 +1943,7 @@ async def handle_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
         # Send to Claude vision
         resp = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-6",
             max_tokens=1500,
             system=IMAGE_PARSE_SYSTEM,
             messages=[{
@@ -2067,7 +2067,7 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         try:
             import json as _json
             resp = client.messages.create(
-                model="claude-sonnet-4-20250514", max_tokens=1500,
+                model="claude-sonnet-4-6", max_tokens=1500,
                 system=IMAGE_PARSE_SYSTEM,
                 messages=[{"role":"user","content":[
                     {"type":"image","source":{"type":"base64","media_type":"image/jpeg","data":img_b64}},
